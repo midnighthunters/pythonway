@@ -95,10 +95,12 @@ def rerank_chunks(
     candidates: List[Dict[str, str]],
     top_k: int = 2,
     score_threshold: float = 7.0,
-) -> List[Dict[str, Any]]:
+    return_all: bool = False,
+) -> Any:
     """
     Evaluates each candidate chunk against the specific query.
     Assigns a precision score from 0.0 to 10.0 and sorts candidates in descending order.
+    Marks each chunk as KEPT or DISCARDED based on score threshold and top_k.
     """
     print(f"\n[STAGE 2: RE-RANKER] Scoring {len(candidates)} candidates against query...")
     llm = get_llm(temperature=0.0)
@@ -137,8 +139,20 @@ def rerank_chunks(
     # Sort descending by score
     reranked.sort(key=lambda x: x["rerank_score"], reverse=True)
 
+    # Tag each candidate with KEPT or DISCARDED
+    for i, c in enumerate(reranked):
+        if c["rerank_score"] < score_threshold:
+            c["rerank_status"] = f"DISCARDED (Score {c['rerank_score']:.1f} < threshold {score_threshold:.1f})"
+        elif i >= top_k:
+            c["rerank_status"] = f"DISCARDED (Rank #{i+1} exceeds top_k={top_k})"
+        else:
+            c["rerank_status"] = "KEPT (Qualified Context)"
+
     # Filter by threshold and top_k
     filtered = [c for c in reranked if c["rerank_score"] >= score_threshold][:top_k]
+
+    if return_all:
+        return reranked, filtered
     return filtered
 
 
@@ -178,21 +192,30 @@ def main():
     print("Notice: Some are about dishwashers, ice machines, or bean storage (noisy distractors!).")
 
     # Run Re-ranking
-    top_chunks = rerank_chunks(user_query, RETRIEVED_CANDIDATE_CHUNKS, top_k=2, score_threshold=6.5)
+    all_chunks, top_chunks = rerank_chunks(
+        user_query,
+        RETRIEVED_CANDIDATE_CHUNKS,
+        top_k=2,
+        score_threshold=6.5,
+        return_all=True,
+    )
 
     print("\n" + "-" * 75)
-    print("RE-RANKING RESULTS (Sorted by Relevance Score):")
+    print("ALL CANDIDATE CHUNKS EVALUATED BY RE-RANKER:")
     print("-" * 75)
-    for i, chunk in enumerate(top_chunks, 1):
-        print(f"Rank #{i} | Score: {chunk['rerank_score']}/10.0 | [{chunk['title']}]")
-        print(f"        Reason: {chunk['rerank_reason']}")
+    for i, chunk in enumerate(all_chunks, 1):
+        status_label = "✅ KEPT" if "KEPT" in chunk["rerank_status"] else "❌ DISCARDED"
+        print(f"Rank #{i} | Score: {chunk['rerank_score']:>4.1f}/10.0 | {status_label}")
+        print(f"        Document: [{chunk['title']}]")
+        print(f"        Status  : {chunk['rerank_status']}")
+        print(f"        Reason  : {chunk['rerank_reason']}\n")
 
     # Select best chunk
     best_chunk = top_chunks[0]
     original_text = best_chunk["text"]
 
     # Run Contextual Compression
-    print("\n" + "-" * 75)
+    print("-" * 75)
     print("[STAGE 3: CONTEXTUAL COMPRESSION] Trimming non-essential filler...")
     print("-" * 75)
 
