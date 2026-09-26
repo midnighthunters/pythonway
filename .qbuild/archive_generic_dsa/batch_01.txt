@@ -1,0 +1,3192 @@
+@@ Two Sum | Easy | Hash map
+Q: Given an integer array `nums` and an integer `target`, return the indices of the two numbers that add up to `target`. Exactly one solution exists and you may not use the same element twice.
+
+Example: `nums = [2, 7, 11, 15], target = 9` → `[0, 1]`
+A:
+Seen in: JPMorgan-tagged list (one of the most frequently reported).
+
+Approach: one pass with a hash map from value to index. For each `x`, check whether `target - x` has already been seen.
+
+```python
+def two_sum(nums: list[int], target: int) -> list[int]:
+    seen: dict[int, int] = {}
+    for i, x in enumerate(nums):
+        if target - x in seen:
+            return [seen[target - x], i]
+        seen[x] = i
+    return []
+
+
+assert two_sum([2, 7, 11, 15], 9) == [0, 1]
+assert two_sum([3, 2, 4], 6) == [1, 2]
+assert two_sum([3, 3], 6) == [0, 1]
+```
+
+Complexity: O(n) time, O(n) space. Brute force is O(n²).
+
+Edge cases: duplicates (`[3, 3]`), negatives, zero target. Store the index after checking, so an element never pairs with itself.
+F:
+- What if the array is sorted? (Two pointers, O(1) extra space.)
+- Return all unique pairs instead of one.
+- What if the input is too large for memory? (Sort externally or partition by hash.)
+
+@@ Contains Duplicate | Easy | Hash set
+Q: Return `True` if any value appears at least twice in `nums`, otherwise `False`.
+
+Example: `[1, 2, 3, 1]` → `True`, `[1, 2, 3, 4]` → `False`
+A:
+Approach: track seen values in a set and exit early on the first repeat.
+
+```python
+def contains_duplicate(nums: list[int]) -> bool:
+    seen: set[int] = set()
+    for x in nums:
+        if x in seen:
+            return True
+        seen.add(x)
+    return False
+
+
+assert contains_duplicate([1, 2, 3, 1]) is True
+assert contains_duplicate([1, 2, 3, 4]) is False
+assert contains_duplicate([]) is False
+```
+
+Complexity: O(n) time, O(n) space. The one-liner `len(set(nums)) != len(nums)` is also O(n) but has no early exit. Sorting gives O(n log n) time and O(1) extra space.
+F:
+- Contains Duplicate II: a repeat within distance `k` (sliding set of size k).
+- Contains Duplicate III: values within `t` and indices within `k` (bucketing).
+
+@@ Valid Anagram | Easy | Counting
+Q: Given strings `s` and `t`, return `True` if `t` is an anagram of `s`.
+
+Example: `"anagram", "nagaram"` → `True`, `"rat", "car"` → `False`
+A:
+Approach: equal lengths and equal character counts.
+
+```python
+from collections import Counter
+
+
+def is_anagram(s: str, t: str) -> bool:
+    return len(s) == len(t) and Counter(s) == Counter(t)
+
+
+assert is_anagram("anagram", "nagaram")
+assert not is_anagram("rat", "car")
+assert not is_anagram("a", "ab")
+```
+
+Complexity: O(n) time, O(k) space for k distinct characters. For lowercase-only input a fixed 26-slot array is O(1) space.
+F:
+- How do you handle Unicode? (Normalise with `unicodedata.normalize`, decide on case folding.)
+- Group many words by anagram class.
+
+@@ Group Anagrams | Medium | Hash map
+Q: Group a list of strings into lists of anagrams, in any order.
+
+Example: `["eat","tea","tan","ate","nat","bat"]` → `[["eat","tea","ate"],["tan","nat"],["bat"]]`
+A:
+Seen in: JPMorgan-tagged list (high frequency).
+
+Approach: use a canonical key per word, either the sorted characters or a 26-count tuple, and bucket words by key.
+
+```python
+from collections import defaultdict
+
+
+def group_anagrams(words: list[str]) -> list[list[str]]:
+    groups: dict[tuple[int, ...], list[str]] = defaultdict(list)
+    for w in words:
+        counts = [0] * 26
+        for ch in w:
+            counts[ord(ch) - ord("a")] += 1
+        groups[tuple(counts)].append(w)
+    return list(groups.values())
+
+
+result = group_anagrams(["eat", "tea", "tan", "ate", "nat", "bat"])
+assert sorted(sorted(g) for g in result) == [["ate", "eat", "tea"], ["bat"], ["nat", "tan"]]
+assert group_anagrams([""]) == [[""]]
+```
+
+Complexity: O(n·k) with the count key, or O(n·k log k) with the sorted key, where k is the word length.
+F:
+- Which key would you use for arbitrary Unicode? (Sorted string, or a `Counter` frozen into a sorted tuple.)
+- How would you do this across a 100 GB file? (Map-reduce on the key.)
+
+@@ First Unique Character in a String | Easy | Counting
+Q: Return the index of the first non-repeating character in `s`, or `-1` if there is none.
+
+Example: `"leetcode"` → `0`, `"loveleetcode"` → `2`, `"aabb"` → `-1`
+A:
+Seen in: JPMorgan-tagged list and reported in online assessments.
+
+Approach: count in one pass, then scan again for the first character with count 1.
+
+```python
+from collections import Counter
+
+
+def first_uniq_char(s: str) -> int:
+    counts = Counter(s)
+    for i, ch in enumerate(s):
+        if counts[ch] == 1:
+            return i
+    return -1
+
+
+assert first_uniq_char("leetcode") == 0
+assert first_uniq_char("loveleetcode") == 2
+assert first_uniq_char("aabb") == -1
+assert first_uniq_char("") == -1
+```
+
+Complexity: O(n) time, O(1) space for a fixed alphabet.
+F:
+- Solve it for a stream of characters (queue plus counts, or an ordered dict).
+- Return the character instead of the index.
+
+@@ Top K Frequent Elements | Medium | Bucket sort
+Q: Return the `k` most frequent elements of `nums`.
+
+Example: `nums = [1,1,1,2,2,3], k = 2` → `[1, 2]`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: count, then bucket values by frequency (a frequency is at most n) and walk the buckets from high to low. The alternative is a size-k min-heap in O(n log k).
+
+```python
+from collections import Counter
+
+
+def top_k_frequent(nums: list[int], k: int) -> list[int]:
+    counts = Counter(nums)
+    buckets: list[list[int]] = [[] for _ in range(len(nums) + 1)]
+    for value, freq in counts.items():
+        buckets[freq].append(value)
+    out: list[int] = []
+    for freq in range(len(buckets) - 1, 0, -1):
+        for value in buckets[freq]:
+            out.append(value)
+            if len(out) == k:
+                return out
+    return out
+
+
+assert top_k_frequent([1, 1, 1, 2, 2, 3], 2) == [1, 2]
+assert top_k_frequent([1], 1) == [1]
+assert sorted(top_k_frequent([4, 4, 5, 5, 6], 2)) == [4, 5]
+```
+
+Complexity: O(n) time and space. The heap version (`heapq.nlargest(k, counts, key=counts.get)`) is O(n log k).
+F:
+- Top-k over a stream that never ends (Count-Min Sketch plus a heap, or Misra-Gries).
+- How do you break ties deterministically?
+
+@@ Product of Array Except Self | Medium | Prefix products
+Q: Return an array where `out[i]` is the product of all elements except `nums[i]`, without using division, in O(n).
+
+Example: `[1,2,3,4]` → `[24,12,8,6]`
+A:
+Approach: `out[i]` = (product of everything left of i) × (product of everything right of i). Fill the left products in a forward pass, then multiply in the right products in a backward pass.
+
+```python
+def product_except_self(nums: list[int]) -> list[int]:
+    n = len(nums)
+    out = [1] * n
+    left = 1
+    for i in range(n):
+        out[i] = left
+        left *= nums[i]
+    right = 1
+    for i in range(n - 1, -1, -1):
+        out[i] *= right
+        right *= nums[i]
+    return out
+
+
+assert product_except_self([1, 2, 3, 4]) == [24, 12, 8, 6]
+assert product_except_self([-1, 1, 0, -3, 3]) == [0, 0, 9, 0, 0]
+```
+
+Complexity: O(n) time, O(1) extra space besides the output.
+
+Why no division: zeros break it, and interviewers want the prefix/suffix idea.
+F:
+- How do you handle overflow in a fixed-width language?
+- Extend the idea: the sum of all elements except self within a window.
+
+@@ Longest Consecutive Sequence | Medium | Hash set
+Q: Return the length of the longest run of consecutive integers in an unsorted array, in O(n).
+
+Example: `[100,4,200,1,3,2]` → `4` (1, 2, 3, 4)
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: put everything in a set. Only start counting from numbers that begin a run (`x - 1` not in the set), so each number is visited at most twice.
+
+```python
+def longest_consecutive(nums: list[int]) -> int:
+    values = set(nums)
+    best = 0
+    for x in values:
+        if x - 1 not in values:
+            length = 1
+            while x + length in values:
+                length += 1
+            best = max(best, length)
+    return best
+
+
+assert longest_consecutive([100, 4, 200, 1, 3, 2]) == 4
+assert longest_consecutive([0, 3, 7, 2, 5, 8, 4, 6, 0, 1]) == 9
+assert longest_consecutive([]) == 0
+```
+
+Complexity: O(n) time, O(n) space. Sorting is O(n log n).
+F:
+- Return the sequence itself.
+- Solve it with union-find (useful when numbers arrive online).
+
+@@ Best Time to Buy and Sell Stock | Easy | Greedy
+Q: Given daily prices, choose one day to buy and a later day to sell to maximise profit. Return the maximum profit, or 0.
+
+Example: `[7,1,5,3,6,4]` → `5`
+A:
+Seen in: JPMorgan-tagged list, and a natural fit for a bank.
+
+Approach: track the minimum price seen so far. The best profit when selling today is `price - min_so_far`.
+
+```python
+def max_profit(prices: list[int]) -> int:
+    best, lowest = 0, float("inf")
+    for p in prices:
+        lowest = min(lowest, p)
+        best = max(best, p - lowest)
+    return int(best)
+
+
+assert max_profit([7, 1, 5, 3, 6, 4]) == 5
+assert max_profit([7, 6, 4, 3, 1]) == 0
+assert max_profit([]) == 0
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Return the buy and sell days.
+- With unlimited transactions, at most two transactions, a cooldown, or a fee (the DP family).
+
+@@ Best Time to Buy and Sell Stock II | Medium | Greedy
+Q: You may complete as many transactions as you like (holding at most one share at a time). Return the maximum profit.
+
+Example: `[7,1,5,3,6,4]` → `7` (buy 1 sell 5, buy 3 sell 6)
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: any profitable multi-day hold equals the sum of its positive day-to-day increases, so add every positive difference.
+
+```python
+def max_profit_unlimited(prices: list[int]) -> int:
+    return sum(max(0, b - a) for a, b in zip(prices, prices[1:]))
+
+
+assert max_profit_unlimited([7, 1, 5, 3, 6, 4]) == 7
+assert max_profit_unlimited([1, 2, 3, 4, 5]) == 4
+assert max_profit_unlimited([7, 6, 4, 3, 1]) == 0
+```
+
+Complexity: O(n) time, O(1) space.
+
+Proof sketch: a transaction from day i to day j equals the telescoping sum of the daily differences, and dropping the negative ones can only help.
+F:
+- Add a transaction fee (DP with `hold` and `cash` states).
+- Add a one-day cooldown after selling.
+
+@@ Maximum Subarray | Medium | Kadane
+Q: Find the contiguous subarray with the largest sum and return that sum.
+
+Example: `[-2,1,-3,4,-1,2,1,-5,4]` → `6` (`[4,-1,2,1]`)
+A:
+Seen in: JPMorgan-tagged list and assessment reports.
+
+Approach (Kadane): the best subarray ending at `i` either extends the best one ending at `i-1` or starts fresh at `i`.
+
+```python
+def max_subarray(nums: list[int]) -> int:
+    best = cur = nums[0]
+    for x in nums[1:]:
+        cur = max(x, cur + x)
+        best = max(best, cur)
+    return best
+
+
+assert max_subarray([-2, 1, -3, 4, -1, 2, 1, -5, 4]) == 6
+assert max_subarray([-1]) == -1
+assert max_subarray([5, 4, -1, 7, 8]) == 23
+assert max_subarray([-3, -2, -5]) == -2
+```
+
+Complexity: O(n) time, O(1) space.
+
+Edge case: all negatives. Starting `best` at 0 is the classic bug.
+F:
+- Return the start and end indices.
+- Maximum circular subarray sum (total minus the minimum subarray, unless everything is negative).
+- Divide-and-conquer O(n log n) version.
+
+@@ Maximum Product Subarray | Medium | Dynamic programming
+Q: Find the contiguous subarray with the largest product.
+
+Example: `[2,3,-2,4]` → `6`, `[-2,3,-4]` → `24`
+A:
+Approach: track both the maximum and the minimum product ending here, because a negative number turns the minimum into the maximum. Swap them when `x < 0`.
+
+```python
+def max_product(nums: list[int]) -> int:
+    hi = lo = best = nums[0]
+    for x in nums[1:]:
+        if x < 0:
+            hi, lo = lo, hi
+        hi = max(x, hi * x)
+        lo = min(x, lo * x)
+        best = max(best, hi)
+    return best
+
+
+assert max_product([2, 3, -2, 4]) == 6
+assert max_product([-2, 0, -1]) == 0
+assert max_product([-2, 3, -4]) == 24
+assert max_product([-2]) == -2
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Why does Kadane's algorithm alone fail here?
+- How do zeros affect the recurrence?
+
+@@ Majority Element | Easy | Boyer-Moore voting
+Q: Return the element that appears more than ⌊n/2⌋ times. It always exists.
+
+Example: `[2,2,1,1,1,2,2]` → `2`
+A:
+Approach (Boyer-Moore): keep a candidate and a counter. A different element cancels one vote, and the true majority survives every cancellation.
+
+```python
+def majority_element(nums: list[int]) -> int:
+    candidate, count = None, 0
+    for x in nums:
+        if count == 0:
+            candidate = x
+        count += 1 if x == candidate else -1
+    return candidate
+
+
+assert majority_element([3, 2, 3]) == 3
+assert majority_element([2, 2, 1, 1, 1, 2, 2]) == 2
+assert majority_element([7]) == 7
+```
+
+Complexity: O(n) time, O(1) space. If a majority is not guaranteed, do a second pass to verify it.
+F:
+- What if a majority may not exist?
+- Elements appearing more than n/3 times.
+
+@@ Majority Element II | Medium | Boyer-Moore voting
+Q: Return all elements that appear more than ⌊n/3⌋ times, in O(n) time and O(1) space.
+
+Example: `[3,2,3]` → `[3]`, `[1,2]` → `[1,2]`
+A:
+Approach: at most two values can exceed n/3, so run Boyer-Moore with two candidates and then verify both counts.
+
+```python
+def majority_element_ii(nums: list[int]) -> list[int]:
+    c1 = c2 = None
+    n1 = n2 = 0
+    for x in nums:
+        if x == c1:
+            n1 += 1
+        elif x == c2:
+            n2 += 1
+        elif n1 == 0:
+            c1, n1 = x, 1
+        elif n2 == 0:
+            c2, n2 = x, 1
+        else:
+            n1 -= 1
+            n2 -= 1
+    limit = len(nums) // 3
+    return sorted(c for c in {c1, c2} if c is not None and nums.count(c) > limit)
+
+
+assert majority_element_ii([3, 2, 3]) == [3]
+assert majority_element_ii([1]) == [1]
+assert majority_element_ii([1, 2]) == [1, 2]
+assert majority_element_ii([2, 2]) == [2]
+assert majority_element_ii([1, 2, 3]) == []
+```
+
+Complexity: O(n) time, O(1) space. The verification pass is required.
+F:
+- Generalise to more than n/k (k-1 candidates, the Misra-Gries summary).
+
+@@ Move Zeroes | Easy | Two pointers
+Q: Move all zeros to the end in place while keeping the relative order of the non-zero elements.
+
+Example: `[0,1,0,3,12]` → `[1,3,12,0,0]`
+A:
+Approach: a write pointer `w` marks where the next non-zero goes. Swap each non-zero into position `w`.
+
+```python
+def move_zeroes(nums: list[int]) -> None:
+    w = 0
+    for i, x in enumerate(nums):
+        if x != 0:
+            nums[w], nums[i] = nums[i], nums[w]
+            w += 1
+
+
+a = [0, 1, 0, 3, 12]
+move_zeroes(a)
+assert a == [1, 3, 12, 0, 0]
+b = [0]
+move_zeroes(b)
+assert b == [0]
+c = [1, 2]
+move_zeroes(c)
+assert c == [1, 2]
+```
+
+Complexity: O(n) time, O(1) space, at most n swaps.
+F:
+- Minimise the number of writes.
+- Move all elements equal to `val` (Remove Element).
+
+@@ Remove Duplicates from Sorted Array | Easy | Two pointers
+Q: Remove duplicates in place from a sorted array and return the number of unique elements `k`. The first `k` slots must hold them in order.
+
+Example: `[0,0,1,1,1,2,2,3,3,4]` → `k = 5`, prefix `[0,1,2,3,4]`
+A:
+Approach: slow/fast pointers. Copy `nums[i]` forward when it differs from the last kept value.
+
+```python
+def remove_duplicates(nums: list[int]) -> int:
+    if not nums:
+        return 0
+    k = 1
+    for i in range(1, len(nums)):
+        if nums[i] != nums[k - 1]:
+            nums[k] = nums[i]
+            k += 1
+    return k
+
+
+a = [0, 0, 1, 1, 1, 2, 2, 3, 3, 4]
+k = remove_duplicates(a)
+assert k == 5 and a[:k] == [0, 1, 2, 3, 4]
+assert remove_duplicates([]) == 0
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Allow each value at most twice (compare with `nums[k-2]`).
+- What if the array is not sorted?
+
+@@ Rotate Array | Medium | Array reversal
+Q: Rotate an array to the right by `k` steps in place.
+
+Example: `[1,2,3,4,5,6,7], k = 3` → `[5,6,7,1,2,3,4]`
+A:
+Approach: reverse the whole array, then reverse the first `k` and the last `n-k` elements. Take `k %= n` first.
+
+```python
+def rotate(nums: list[int], k: int) -> None:
+    n = len(nums)
+    if n == 0:
+        return
+    k %= n
+
+    def reverse(i: int, j: int) -> None:
+        while i < j:
+            nums[i], nums[j] = nums[j], nums[i]
+            i, j = i + 1, j - 1
+
+    reverse(0, n - 1)
+    reverse(0, k - 1)
+    reverse(k, n - 1)
+
+
+a = [1, 2, 3, 4, 5, 6, 7]
+rotate(a, 3)
+assert a == [5, 6, 7, 1, 2, 3, 4]
+b = [-1, -100, 3, 99]
+rotate(b, 2)
+assert b == [3, 99, -1, -100]
+c = [1, 2]
+rotate(c, 5)
+assert c == [2, 1]
+```
+
+Complexity: O(n) time, O(1) space. The slicing one-liner `nums[:] = nums[-k:] + nums[:-k]` uses O(n) extra space.
+F:
+- Rotate left instead.
+- The cyclic-replacement approach: how many cycles are there? (gcd(n, k).)
+
+@@ Merge Sorted Array | Easy | Two pointers
+Q: `nums1` has length `m + n`, with its first `m` elements sorted and the rest zeros. Merge the sorted `nums2` (length `n`) into it in place.
+
+Example: `[1,2,3,0,0,0], m=3, nums2=[2,5,6]` → `[1,2,2,3,5,6]`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: fill from the back so nothing gets overwritten. Stop when `nums2` is exhausted, because whatever remains of `nums1` is already in place.
+
+```python
+def merge(nums1: list[int], m: int, nums2: list[int], n: int) -> None:
+    i, j, w = m - 1, n - 1, m + n - 1
+    while j >= 0:
+        if i >= 0 and nums1[i] > nums2[j]:
+            nums1[w] = nums1[i]
+            i -= 1
+        else:
+            nums1[w] = nums2[j]
+            j -= 1
+        w -= 1
+
+
+a = [1, 2, 3, 0, 0, 0]
+merge(a, 3, [2, 5, 6], 3)
+assert a == [1, 2, 2, 3, 5, 6]
+b = [0]
+merge(b, 0, [1], 1)
+assert b == [1]
+```
+
+Complexity: O(m + n) time, O(1) space.
+F:
+- Merge k sorted arrays (heap).
+- Why does filling from the front fail?
+
+@@ Intersection of Two Arrays | Easy | Hash set
+Q: Return the unique elements present in both arrays.
+
+Example: `[1,2,2,1]` and `[2,2]` → `[2]`
+A:
+Seen in: JPMorgan-tagged list.
+
+```python
+def intersection(a: list[int], b: list[int]) -> list[int]:
+    return sorted(set(a) & set(b))
+
+
+assert intersection([1, 2, 2, 1], [2, 2]) == [2]
+assert intersection([4, 9, 5], [9, 4, 9, 8, 4]) == [4, 9]
+assert intersection([], [1]) == []
+```
+
+Complexity: O(n + m) time and space. If both inputs are already sorted, two pointers use O(1) extra space.
+F:
+- What if one array is tiny and the other is huge? (Build the set from the small one.)
+- What if the arrays are on disk? (External sort, then merge.)
+
+@@ Intersection of Two Arrays II | Easy | Counting
+Q: Return the intersection including multiplicity: each element appears as many times as it shows in both arrays.
+
+Example: `[1,2,2,1]` and `[2,2]` → `[2,2]`
+A:
+Approach: `Counter` intersection takes the minimum of the counts.
+
+```python
+from collections import Counter
+
+
+def intersect(a: list[int], b: list[int]) -> list[int]:
+    return sorted((Counter(a) & Counter(b)).elements())
+
+
+assert intersect([1, 2, 2, 1], [2, 2]) == [2, 2]
+assert intersect([4, 9, 5], [9, 4, 9, 8, 4]) == [4, 9]
+```
+
+Complexity: O(n + m).
+F:
+- If `nums2` is streamed from disk and only `nums1` fits in memory?
+- What if both arrays are sorted?
+
+@@ Missing Number | Easy | Math and XOR
+Q: `nums` contains n distinct numbers from `[0, n]`. Return the one that is missing.
+
+Example: `[3,0,1]` → `2`
+A:
+Approach: the expected sum `n(n+1)/2` minus the actual sum. XOR of all indices and values also works and never overflows in fixed-width languages.
+
+```python
+from functools import reduce
+from operator import xor
+
+
+def missing_number(nums: list[int]) -> int:
+    n = len(nums)
+    return n * (n + 1) // 2 - sum(nums)
+
+
+def missing_number_xor(nums: list[int]) -> int:
+    return reduce(xor, range(len(nums) + 1), 0) ^ reduce(xor, nums, 0)
+
+
+for f in (missing_number, missing_number_xor):
+    assert f([3, 0, 1]) == 2
+    assert f([0, 1]) == 2
+    assert f([9, 6, 4, 2, 3, 5, 7, 0, 1]) == 8
+    assert f([1]) == 0
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Two numbers are missing (partition by a set bit of the XOR).
+- One missing and one duplicated.
+
+@@ Find All Numbers Disappeared in an Array | Easy | Index marking
+Q: `nums` has n integers in `[1, n]`, some repeated. Return all numbers in `[1, n]` that do not appear, with O(1) extra space.
+
+Example: `[4,3,2,7,8,2,3,1]` → `[5,6]`
+A:
+Approach: use the array itself as a presence map. For each value `v`, negate `nums[v-1]`. Indices that stay positive are missing.
+
+```python
+def find_disappeared_numbers(nums: list[int]) -> list[int]:
+    for x in nums:
+        i = abs(x) - 1
+        if nums[i] > 0:
+            nums[i] = -nums[i]
+    return [i + 1 for i, x in enumerate(nums) if x > 0]
+
+
+assert find_disappeared_numbers([4, 3, 2, 7, 8, 2, 3, 1]) == [5, 6]
+assert find_disappeared_numbers([1, 1]) == [2]
+```
+
+Complexity: O(n) time, O(1) extra space. This mutates the input. Say so, and restore the signs afterwards if the caller needs the original.
+F:
+- Find all duplicates using the same trick.
+- Why use `abs(x)`?
+
+@@ Find the Duplicate Number | Medium | Floyd cycle detection
+Q: `nums` has n+1 integers in `[1, n]`, and exactly one value is repeated (possibly many times). Find it without modifying the array, using O(1) space.
+
+Example: `[1,3,4,2,2]` → `2`
+A:
+Approach: treat `i → nums[i]` as a linked list. The duplicate value is the entry point of a cycle, so use Floyd's tortoise and hare.
+
+```python
+def find_duplicate(nums: list[int]) -> int:
+    slow = fast = nums[0]
+    while True:
+        slow = nums[slow]
+        fast = nums[nums[fast]]
+        if slow == fast:
+            break
+    slow = nums[0]
+    while slow != fast:
+        slow = nums[slow]
+        fast = nums[fast]
+    return slow
+
+
+assert find_duplicate([1, 3, 4, 2, 2]) == 2
+assert find_duplicate([3, 1, 3, 4, 2]) == 3
+assert find_duplicate([3, 3, 3, 3, 3]) == 3
+```
+
+Complexity: O(n) time, O(1) space. An alternative is binary search on the value range, counting elements ≤ mid, in O(n log n).
+F:
+- Prove why the second phase finds the cycle entry.
+- Which approach would you choose in production, and why?
+
+@@ First Missing Positive | Hard | Cyclic placement
+Q: Return the smallest missing positive integer in an unsorted array, in O(n) time and O(1) extra space.
+
+Example: `[3,4,-1,1]` → `2`, `[7,8,9,11,12]` → `1`
+A:
+Approach: the answer is in `[1, n+1]`. Swap each value `v` in `[1, n]` into slot `v-1`, then the first slot `i` with `nums[i] != i+1` gives the answer.
+
+```python
+def first_missing_positive(nums: list[int]) -> int:
+    n = len(nums)
+    for i in range(n):
+        while 1 <= nums[i] <= n and nums[nums[i] - 1] != nums[i]:
+            j = nums[i] - 1
+            nums[i], nums[j] = nums[j], nums[i]
+    for i in range(n):
+        if nums[i] != i + 1:
+            return i + 1
+    return n + 1
+
+
+assert first_missing_positive([1, 2, 0]) == 3
+assert first_missing_positive([3, 4, -1, 1]) == 2
+assert first_missing_positive([7, 8, 9, 11, 12]) == 1
+assert first_missing_positive([1, 1]) == 2
+```
+
+Complexity: O(n). Each swap places one value permanently.
+
+Python gotcha: `nums[i], nums[nums[i]-1] = ...` is buggy because `nums[i]` changes mid-assignment. Compute `j` first.
+F:
+- Why is the while-loop still O(n) overall?
+- Solve it without swaps (sign marking after clearing out-of-range values).
+
+@@ Next Permutation | Medium | Array manipulation
+Q: Rearrange `nums` in place into the next lexicographically greater permutation. If none exists, rearrange it into ascending order.
+
+Example: `[1,2,3]` → `[1,3,2]`, `[3,2,1]` → `[1,2,3]`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach:
+1. From the right, find the first `i` with `nums[i] < nums[i+1]` (the pivot).
+2. If it exists, swap it with the rightmost element greater than it.
+3. Reverse the suffix after `i`, which is descending, to make it the smallest possible.
+
+```python
+def next_permutation(nums: list[int]) -> None:
+    i = len(nums) - 2
+    while i >= 0 and nums[i] >= nums[i + 1]:
+        i -= 1
+    if i >= 0:
+        j = len(nums) - 1
+        while nums[j] <= nums[i]:
+            j -= 1
+        nums[i], nums[j] = nums[j], nums[i]
+    nums[i + 1:] = reversed(nums[i + 1:])
+
+
+for before, after in [([1, 2, 3], [1, 3, 2]), ([3, 2, 1], [1, 2, 3]),
+                      ([1, 1, 5], [1, 5, 1]), ([1, 3, 2], [2, 1, 3])]:
+    next_permutation(before)
+    assert before == after
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Previous permutation.
+- The k-th permutation of 1..n (factorial number system).
+
+@@ Plus One | Easy | Array arithmetic
+Q: A non-negative integer is stored as an array of digits (most significant first). Add one and return the new array.
+
+Example: `[1,2,3]` → `[1,2,4]`, `[9,9]` → `[1,0,0]`
+A:
+Approach: walk from the right. A digit below 9 is incremented and you return; a 9 becomes 0 and the carry continues. If every digit was 9, prepend 1.
+
+```python
+def plus_one(digits: list[int]) -> list[int]:
+    out = digits[:]
+    for i in range(len(out) - 1, -1, -1):
+        if out[i] < 9:
+            out[i] += 1
+            return out
+        out[i] = 0
+    return [1] + out
+
+
+assert plus_one([1, 2, 3]) == [1, 2, 4]
+assert plus_one([9, 9]) == [1, 0, 0]
+assert plus_one([0]) == [1]
+```
+
+Complexity: O(n) worst case, O(1) amortised over repeated increments.
+F:
+- Add two digit arrays.
+- Why not convert to `int`? (It works in Python, but it hides the algorithm and fails for fixed-width types in other languages.)
+
+@@ Pascal's Triangle | Easy | Array construction
+Q: Return the first `num_rows` rows of Pascal's triangle.
+
+Example: `5` → `[[1],[1,1],[1,2,1],[1,3,3,1],[1,4,6,4,1]]`
+A:
+Seen in: JPMorgan-tagged list.
+
+```python
+def generate(num_rows: int) -> list[list[int]]:
+    rows: list[list[int]] = []
+    for r in range(num_rows):
+        row = [1] * (r + 1)
+        for c in range(1, r):
+            row[c] = rows[r - 1][c - 1] + rows[r - 1][c]
+        rows.append(row)
+    return rows
+
+
+assert generate(5) == [[1], [1, 1], [1, 2, 1], [1, 3, 3, 1], [1, 4, 6, 4, 1]]
+assert generate(1) == [[1]]
+assert generate(0) == []
+```
+
+Complexity: O(n²) time and output size.
+F:
+- Return only row k using O(k) space (update right to left).
+- Compute C(n, k) mod p for large n.
+
+@@ Rotate Image | Medium | Matrix
+Q: Rotate an n×n matrix 90° clockwise in place.
+
+Example: `[[1,2,3],[4,5,6],[7,8,9]]` → `[[7,4,1],[8,5,2],[9,6,3]]`
+A:
+Seen in: JPMorgan-tagged list (high frequency).
+
+Approach: transpose (swap `m[i][j]` with `m[j][i]` for `j > i`), then reverse each row. For counter-clockwise, reverse each row first and then transpose.
+
+```python
+def rotate_matrix(m: list[list[int]]) -> None:
+    n = len(m)
+    for i in range(n):
+        for j in range(i + 1, n):
+            m[i][j], m[j][i] = m[j][i], m[i][j]
+    for row in m:
+        row.reverse()
+
+
+a = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
+rotate_matrix(a)
+assert a == [[7, 4, 1], [8, 5, 2], [9, 6, 3]]
+b = [[5, 1, 9, 11], [2, 4, 8, 10], [13, 3, 6, 7], [15, 14, 12, 16]]
+rotate_matrix(b)
+assert b == [[15, 13, 2, 5], [14, 3, 4, 1], [12, 6, 8, 9], [16, 7, 10, 11]]
+```
+
+Complexity: O(n²) time, O(1) space.
+F:
+- Rotate by 180° or 270°.
+- Non-square matrices. (Not possible in place; allocate a new m×n.)
+
+@@ Spiral Matrix | Medium | Matrix
+Q: Return all elements of an m×n matrix in clockwise spiral order.
+
+Example: `[[1,2,3],[4,5,6],[7,8,9]]` → `[1,2,3,6,9,8,7,4,5]`
+A:
+Approach: shrink four boundaries: top row left→right, right column top→bottom, bottom row right→left (if rows remain), left column bottom→top (if columns remain).
+
+```python
+def spiral_order(m: list[list[int]]) -> list[int]:
+    if not m or not m[0]:
+        return []
+    out: list[int] = []
+    top, bottom, left, right = 0, len(m) - 1, 0, len(m[0]) - 1
+    while top <= bottom and left <= right:
+        out.extend(m[top][c] for c in range(left, right + 1))
+        top += 1
+        out.extend(m[r][right] for r in range(top, bottom + 1))
+        right -= 1
+        if top <= bottom:
+            out.extend(m[bottom][c] for c in range(right, left - 1, -1))
+            bottom -= 1
+        if left <= right:
+            out.extend(m[r][left] for r in range(bottom, top - 1, -1))
+            left += 1
+    return out
+
+
+assert spiral_order([[1, 2, 3], [4, 5, 6], [7, 8, 9]]) == [1, 2, 3, 6, 9, 8, 7, 4, 5]
+assert spiral_order([[1, 2, 3, 4], [5, 6, 7, 8], [9, 10, 11, 12]]) == [1, 2, 3, 4, 8, 12, 11, 10, 9, 5, 6, 7]
+assert spiral_order([[1], [2], [3]]) == [1, 2, 3]
+```
+
+Complexity: O(m·n) time, O(1) extra space.
+
+The two `if` guards prevent re-reading a single leftover row or column.
+F:
+- Generate an n×n spiral matrix filled with 1..n².
+- Spiral order starting from a given cell.
+
+@@ Set Matrix Zeroes | Medium | Matrix
+Q: If a cell is 0, set its entire row and column to 0, in place. Aim for O(1) extra space.
+
+Example: `[[1,1,1],[1,0,1],[1,1,1]]` → `[[1,0,1],[0,0,0],[1,0,1]]`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: use the first row and first column as marker arrays. Remember separately whether they contained a zero themselves.
+
+```python
+def set_zeroes(m: list[list[int]]) -> None:
+    rows, cols = len(m), len(m[0])
+    first_row = any(m[0][c] == 0 for c in range(cols))
+    first_col = any(m[r][0] == 0 for r in range(rows))
+    for r in range(1, rows):
+        for c in range(1, cols):
+            if m[r][c] == 0:
+                m[r][0] = m[0][c] = 0
+    for r in range(1, rows):
+        for c in range(1, cols):
+            if m[r][0] == 0 or m[0][c] == 0:
+                m[r][c] = 0
+    if first_row:
+        for c in range(cols):
+            m[0][c] = 0
+    if first_col:
+        for r in range(rows):
+            m[r][0] = 0
+
+
+a = [[1, 1, 1], [1, 0, 1], [1, 1, 1]]
+set_zeroes(a)
+assert a == [[1, 0, 1], [0, 0, 0], [1, 0, 1]]
+b = [[0, 1, 2, 0], [3, 4, 5, 2], [1, 3, 1, 5]]
+set_zeroes(b)
+assert b == [[0, 0, 0, 0], [0, 4, 5, 0], [0, 3, 1, 0]]
+```
+
+Complexity: O(m·n) time, O(1) extra space. Start with the simpler version that keeps row and column sets in O(m+n), then optimise.
+F:
+- Why must the first row and column be handled last?
+- Do it for a sparse matrix stored as a coordinate list.
+
+@@ Valid Sudoku | Medium | Hash set
+Q: Decide whether a partially filled 9×9 Sudoku board is valid: no repeated digit in any row, column or 3×3 box. Empty cells are `.`.
+A:
+Approach: one set of tagged keys, `("r", row, d)`, `("c", col, d)` and `("b", row//3, col//3, d)`. A repeated key means the board is invalid.
+
+```python
+def is_valid_sudoku(board: list[str]) -> bool:
+    seen: set[tuple] = set()
+    for r in range(9):
+        for c in range(9):
+            d = board[r][c]
+            if d == ".":
+                continue
+            keys = (("r", r, d), ("c", c, d), ("b", r // 3, c // 3, d))
+            if any(k in seen for k in keys):
+                return False
+            seen.update(keys)
+    return True
+
+
+valid = ["53..7....", "6..195...", ".98....6.", "8...6...3", "4..8.3..1",
+         "7...2...6", ".6....28.", "...419..5", "....8..79"]
+assert is_valid_sudoku(valid)
+invalid = ["83..7...."] + valid[1:]
+assert not is_valid_sudoku(invalid)
+```
+
+Complexity: O(81), which is constant. For an n×n board it is O(n²).
+F:
+- Solve the Sudoku (backtracking with bitmasks).
+- How would you give a useful error message showing which cell conflicts?
+
+@@ Game of Life | Medium | Matrix state encoding
+Q: Compute the next state of Conway's Game of Life in place. A live cell with 2 or 3 live neighbours survives, and a dead cell with exactly 3 becomes alive.
+
+Example: `[[0,1,0],[0,0,1],[1,1,1],[0,0,0]]` → `[[0,0,0],[1,0,1],[0,1,1],[0,1,0]]`
+A:
+Approach: keep the current state in bit 0 and write the next state into bit 1, so neighbour counts still read the original. Shift right at the end.
+
+```python
+def game_of_life(board: list[list[int]]) -> None:
+    rows, cols = len(board), len(board[0])
+    for r in range(rows):
+        for c in range(cols):
+            live = sum(board[nr][nc] & 1
+                       for nr in range(max(0, r - 1), min(rows, r + 2))
+                       for nc in range(max(0, c - 1), min(cols, c + 2))
+                       if (nr, nc) != (r, c))
+            if (board[r][c] & 1 and live in (2, 3)) or (not board[r][c] & 1 and live == 3):
+                board[r][c] |= 2
+    for r in range(rows):
+        for c in range(cols):
+            board[r][c] >>= 1
+
+
+b = [[0, 1, 0], [0, 0, 1], [1, 1, 1], [0, 0, 0]]
+game_of_life(b)
+assert b == [[0, 0, 0], [1, 0, 1], [0, 1, 1], [0, 1, 0]]
+```
+
+Complexity: O(m·n) time, O(1) extra space.
+F:
+- An infinite board (store only the live cells in a set).
+- Parallelise it (double buffering, or split the grid into tiles with halo rows).
+
+@@ Diagonal Traverse | Medium | Matrix
+Q: Return the elements of an m×n matrix in zig-zag diagonal order.
+
+Example: `[[1,2,3],[4,5,6],[7,8,9]]` → `[1,2,4,7,5,3,6,8,9]`
+A:
+Approach: cells on the same anti-diagonal share `r + c = d`. Collect each diagonal top to bottom and reverse the even ones.
+
+```python
+def find_diagonal_order(mat: list[list[int]]) -> list[int]:
+    if not mat or not mat[0]:
+        return []
+    rows, cols = len(mat), len(mat[0])
+    out: list[int] = []
+    for d in range(rows + cols - 1):
+        diag = [mat[r][d - r] for r in range(max(0, d - cols + 1), min(rows, d + 1))]
+        out.extend(reversed(diag) if d % 2 == 0 else diag)
+    return out
+
+
+assert find_diagonal_order([[1, 2, 3], [4, 5, 6], [7, 8, 9]]) == [1, 2, 4, 7, 5, 3, 6, 8, 9]
+assert find_diagonal_order([[1, 2], [3, 4]]) == [1, 2, 3, 4]
+```
+
+Complexity: O(m·n) time. There is O(min(m, n)) temporary space per diagonal.
+F:
+- Walk it with direction flips instead of buffering each diagonal.
+- Traverse a jagged list (Diagonal Traverse II: bucket by `r + c`).
+
+@@ Maximum Product of Two Elements in an Array | Easy | Single pass
+Q: Return the maximum value of `(nums[i]-1) * (nums[j]-1)` for `i != j`. All values are at least 1.
+
+Example: `[3,4,5,2]` → `12`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: track the two largest values in one pass. Sorting also works in O(n log n).
+
+```python
+def max_product_two(nums: list[int]) -> int:
+    first = second = 0
+    for x in nums:
+        if x > first:
+            first, second = x, first
+        elif x > second:
+            second = x
+    return (first - 1) * (second - 1)
+
+
+assert max_product_two([3, 4, 5, 2]) == 12
+assert max_product_two([1, 5, 4, 5]) == 16
+assert max_product_two([3, 7]) == 12
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- If values can be negative, what changes? (Also consider the two smallest.)
+- Generalise to the top k (`heapq.nlargest`).
+
+@@ Minimum Absolute Difference | Easy | Sorting
+Q: Given distinct integers, return all pairs `[a, b]` (with `a < b`) whose difference equals the minimum absolute difference, in ascending order.
+
+Example: `[4,2,1,3]` → `[[1,2],[2,3],[3,4]]`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: after sorting, the minimum difference is between neighbours. Make one pass for the minimum and another to collect the pairs.
+
+```python
+def minimum_abs_difference(arr: list[int]) -> list[list[int]]:
+    a = sorted(arr)
+    best = min(y - x for x, y in zip(a, a[1:]))
+    return [[x, y] for x, y in zip(a, a[1:]) if y - x == best]
+
+
+assert minimum_abs_difference([4, 2, 1, 3]) == [[1, 2], [2, 3], [3, 4]]
+assert minimum_abs_difference([1, 3, 6, 10, 15]) == [[1, 3]]
+assert minimum_abs_difference([3, 8, -10, 23, 19, -4, -14, 27]) == [[-14, -10], [19, 23], [23, 27]]
+```
+
+Complexity: O(n log n) time. Counting sort brings it to O(n + range) if the value range is small.
+F:
+- Do it in a single pass after sorting.
+- Minimum absolute difference between two different arrays (sort both, then two pointers).
+
+@@ Sum of Absolute Differences in a Sorted Array | Medium | Prefix sums
+Q: Given a sorted array, return `out` where `out[i] = sum(|nums[i] - nums[j]|)` over all j.
+
+Example: `[2,3,5]` → `[4,3,5]`
+A:
+Seen in: reported in 2025/2026 JPMorganChase HackerRank assessments.
+
+Approach: in a sorted array, elements left of i are ≤ `nums[i]` and elements right of it are ≥ `nums[i]`, so:
+`out[i] = nums[i]*i - left_sum + right_sum - nums[i]*(n-1-i)`.
+
+```python
+def get_sum_absolute_differences(nums: list[int]) -> list[int]:
+    total, n, left = sum(nums), len(nums), 0
+    out: list[int] = []
+    for i, x in enumerate(nums):
+        right = total - left - x
+        out.append(x * i - left + right - x * (n - 1 - i))
+        left += x
+    return out
+
+
+assert get_sum_absolute_differences([2, 3, 5]) == [4, 3, 5]
+assert get_sum_absolute_differences([1, 4, 6, 8, 10]) == [24, 15, 13, 15, 21]
+brute = lambda a: [sum(abs(x - y) for y in a) for x in a]
+assert get_sum_absolute_differences([1, 1, 2, 9]) == brute([1, 1, 2, 9])
+```
+
+Complexity: O(n) time, O(1) extra space. Brute force is O(n²) and times out on HackerRank limits (n up to 10^5).
+F:
+- What if the array isn't sorted? (Sort with indices, compute, then map back.)
+- Answer many "sum of |x - q|" queries (sort + prefix sums + binary search).
+
+@@ Divide Players Into Teams of Equal Skill | Medium | Sorting
+Q: Split an even-length array into pairs so every pair has the same total. Return the sum of the products of the pairs, or `-1` if that's impossible.
+
+Example: `[3,2,5,1,3,4]` → `22` (pairs (1,5),(2,4),(3,3))
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: if equal pair sums are possible, the smallest must pair with the largest. Sort and pair from both ends.
+
+```python
+def divide_players(skill: list[int]) -> int:
+    s = sorted(skill)
+    target = s[0] + s[-1]
+    chemistry = 0
+    for i in range(len(s) // 2):
+        a, b = s[i], s[-1 - i]
+        if a + b != target:
+            return -1
+        chemistry += a * b
+    return chemistry
+
+
+assert divide_players([3, 2, 5, 1, 3, 4]) == 22
+assert divide_players([3, 4]) == 12
+assert divide_players([1, 1, 2, 3]) == -1
+```
+
+Complexity: O(n log n). With a counting approach, `target = 2*sum/n` and matching complements via a Counter gives O(n).
+F:
+- Prove the smallest must pair with the largest.
+- The O(n) counting version.
+
+@@ Maximum Units on a Truck | Easy | Greedy
+Q: `box_types[i] = [count, units_per_box]`. The truck holds at most `truck_size` boxes. Maximise the total units.
+
+Example: `[[1,3],[2,2],[3,1]], truck_size = 4` → `8`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: fractional-knapsack style greedy where every box has the same weight, so take the boxes with the most units first.
+
+```python
+def maximum_units(box_types: list[list[int]], truck_size: int) -> int:
+    total = 0
+    for count, units in sorted(box_types, key=lambda b: -b[1]):
+        take = min(count, truck_size)
+        total += take * units
+        truck_size -= take
+        if truck_size == 0:
+            break
+    return total
+
+
+assert maximum_units([[1, 3], [2, 2], [3, 1]], 4) == 8
+assert maximum_units([[5, 10], [2, 5], [4, 7], [3, 9]], 10) == 91
+assert maximum_units([[1, 1]], 0) == 0
+```
+
+Complexity: O(k log k) for k box types. Units are bounded (≤ 1000), so bucket counting gives O(k + 1000).
+F:
+- Why is greedy optimal here but not for 0/1 knapsack with different weights?
+- Box types arriving as a stream.
+
+@@ Rearrange Array to Maximize Prefix Score | Medium | Greedy
+Q: Rearrange `nums` to maximise the number of positive prefix sums. Return that count.
+
+Example: `[2,-1,0,1,-3,3,-3]` → `6`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: sort in descending order. Putting large values first keeps every prefix sum as large as possible, so count prefixes that stay above 0.
+
+```python
+from itertools import accumulate
+
+
+def max_score(nums: list[int]) -> int:
+    return sum(1 for p in accumulate(sorted(nums, reverse=True)) if p > 0)
+
+
+assert max_score([2, -1, 0, 1, -3, 3, -3]) == 6
+assert max_score([-2, -3, 0]) == 0
+assert max_score([1]) == 1
+```
+
+Complexity: O(n log n). You can break early once a prefix is ≤ 0, since the rest only decrease.
+
+Note: in fixed-width languages use 64-bit sums (values up to 10^6 × n up to 10^5).
+F:
+- Prove the exchange argument.
+- Maximise the number of non-negative prefixes instead.
+
+@@ Find the Winner of an Array Game | Medium | Simulation
+Q: Compare `arr[0]` and `arr[1]`. The larger stays at the front and the smaller goes to the back. The first integer to win `k` consecutive rounds wins. Return it.
+
+Example: `[2,1,3,5,4,6,7], k = 2` → `5`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: you never need to rotate. Scan once while tracking the current champion and its win streak. If nobody reaches `k` in one pass, the maximum wins forever.
+
+```python
+def get_winner(arr: list[int], k: int) -> int:
+    champion, wins = arr[0], 0
+    for x in arr[1:]:
+        if x > champion:
+            champion, wins = x, 1
+        else:
+            wins += 1
+        if wins == k:
+            return champion
+    return champion
+
+
+assert get_winner([2, 1, 3, 5, 4, 6, 7], 2) == 5
+assert get_winner([3, 2, 1], 10) == 3
+assert get_winner([1, 9, 8, 2, 3, 7, 6, 4, 5], 7) == 9
+assert get_winner([1, 11, 22, 33, 44, 55, 66, 77, 88, 99], 1_000_000_000) == 99
+```
+
+Complexity: O(n) time, O(1) space, independent of k (which can be 10^9).
+F:
+- Why is simulating with a deque too slow for large k?
+- Return the number of rounds played.
+
+@@ Count Highly Profitable Intervals | Medium | Run length
+Q: Given monthly stock prices and `k`, count the windows of `k` consecutive months where prices are strictly increasing.
+
+Example: `prices = [5,3,5,7,8], k = 3` → `2` (`[3,5,7]` and `[5,7,8]`)
+A:
+Seen in: a JPMorganChase on-campus online assessment (GeeksforGeeks write-up).
+
+Approach: track the length of the current strictly increasing run. Every index where the run length is at least `k` ends exactly one valid window.
+
+```python
+def count_profitable_intervals(prices: list[int], k: int) -> int:
+    count = run = 0
+    for i, p in enumerate(prices):
+        run = run + 1 if i > 0 and p > prices[i - 1] else 1
+        if run >= k:
+            count += 1
+    return count
+
+
+assert count_profitable_intervals([5, 3, 5, 7, 8], 3) == 2
+assert count_profitable_intervals([1, 1, 1], 1) == 3
+assert count_profitable_intervals([1, 2, 3, 4], 2) == 3
+assert count_profitable_intervals([4, 3, 2], 2) == 0
+```
+
+Complexity: O(n) time, O(1) space. Brute force checks every window in O(n·k).
+F:
+- Count all strictly increasing subarrays of any length (sum of L(L+1)/2 per run).
+- Allow at most one dip in the window.
+
+@@ Happy Number | Easy | Cycle detection
+Q: Repeatedly replace n with the sum of the squares of its digits. n is happy if this reaches 1. Return whether n is happy.
+
+Example: `19` → `True` (1+81=82 → 68 → 100 → 1), `2` → `False`
+A:
+Seen in: JPMorgan-tagged list (one of the most frequent).
+
+Approach: the sequence either reaches 1 or enters a cycle, so detect the cycle with a set or with Floyd's two pointers for O(1) space.
+
+```python
+def is_happy(n: int) -> bool:
+    def step(x: int) -> int:
+        total = 0
+        while x:
+            x, d = divmod(x, 10)
+            total += d * d
+        return total
+
+    slow, fast = n, step(n)
+    while fast != 1 and slow != fast:
+        slow, fast = step(slow), step(step(fast))
+    return fast == 1
+
+
+assert is_happy(19) is True
+assert is_happy(2) is False
+assert is_happy(1) is True
+assert is_happy(7) is True
+```
+
+Complexity: O(log n) per step. Values quickly fall below 243 (3 digits × 81), so the number of steps is small.
+F:
+- Why is the sequence guaranteed to be bounded?
+- Set-based version versus Floyd: trade-offs.
+
+@@ Fizz Buzz | Easy | Warm-up
+Q: For 1..n, output "Fizz" for multiples of 3, "Buzz" for multiples of 5, "FizzBuzz" for multiples of both, and the number otherwise.
+A:
+Seen in: JPMorgan-tagged list. It is often used as a warm-up, where readability and extensibility are what get judged.
+
+Approach: build the string from a rule table, so adding "Bazz" for 7 is a one-line change.
+
+```python
+def fizz_buzz(n: int, rules: tuple[tuple[int, str], ...] = ((3, "Fizz"), (5, "Buzz"))) -> list[str]:
+    out = []
+    for i in range(1, n + 1):
+        word = "".join(label for d, label in rules if i % d == 0)
+        out.append(word or str(i))
+    return out
+
+
+assert fizz_buzz(15)[-1] == "FizzBuzz"
+assert fizz_buzz(5) == ["1", "2", "Fizz", "4", "Buzz"]
+assert fizz_buzz(21, ((3, "Fizz"), (5, "Buzz"), (7, "Bazz")))[-1] == "FizzBazz"
+```
+
+Complexity: O(n · rules).
+F:
+- Make it a generator for very large n.
+- How would you unit test it?
+
+@@ Roman to Integer | Easy | Parsing
+Q: Convert a Roman numeral string to an integer.
+
+Example: `"MCMXCIV"` → `1994`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: add each symbol's value, but subtract it when a larger symbol follows (IV, IX, XL, XC, CD, CM).
+
+```python
+VALUES = {"I": 1, "V": 5, "X": 10, "L": 50, "C": 100, "D": 500, "M": 1000}
+
+
+def roman_to_int(s: str) -> int:
+    total = 0
+    for i, ch in enumerate(s):
+        v = VALUES[ch]
+        if i + 1 < len(s) and v < VALUES[s[i + 1]]:
+            total -= v
+        else:
+            total += v
+    return total
+
+
+assert roman_to_int("III") == 3
+assert roman_to_int("LVIII") == 58
+assert roman_to_int("MCMXCIV") == 1994
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Validate the input (reject "IIII", "IC" and "VX").
+- Integer to Roman.
+
+@@ Integer to Roman | Medium | Greedy
+Q: Convert an integer from 1 to 3999 to a Roman numeral.
+
+Example: `3749` → `"MMMDCCXLIX"`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: greedy over a table that includes the six subtractive pairs, largest first.
+
+```python
+TABLE = [(1000, "M"), (900, "CM"), (500, "D"), (400, "CD"), (100, "C"), (90, "XC"),
+         (50, "L"), (40, "XL"), (10, "X"), (9, "IX"), (5, "V"), (4, "IV"), (1, "I")]
+
+
+def int_to_roman(num: int) -> str:
+    if not 1 <= num <= 3999:
+        raise ValueError("num must be in 1..3999")
+    parts = []
+    for value, symbol in TABLE:
+        count, num = divmod(num, value)
+        parts.append(symbol * count)
+    return "".join(parts)
+
+
+assert int_to_roman(3749) == "MMMDCCXLIX"
+assert int_to_roman(58) == "LVIII"
+assert int_to_roman(1994) == "MCMXCIV"
+```
+
+Complexity: O(1), because the table and output length are bounded.
+F:
+- Round-trip property test with `roman_to_int` for 1..3999.
+- Why does greedy work for this coin system?
+
+@@ Integer to English Words | Hard | String building
+Q: Convert a non-negative integer (up to 2³¹ - 1) to English words.
+
+Example: `1234567` → `"One Million Two Hundred Thirty Four Thousand Five Hundred Sixty Seven"`
+A:
+Seen in: JPMorgan-tagged list. Cheque-writing is a banking use case.
+
+Approach: process groups of three digits (billion, million, thousand, units) with a helper for 0..999. Skip empty groups so 1,000,010 does not print "Zero Thousand".
+
+```python
+BELOW_20 = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten",
+            "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen",
+            "Eighteen", "Nineteen"]
+TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"]
+
+
+def number_to_words(num: int) -> str:
+    if num == 0:
+        return "Zero"
+
+    def below_1000(n: int) -> list[str]:
+        if n == 0:
+            return []
+        if n < 20:
+            return [BELOW_20[n]]
+        if n < 100:
+            return [TENS[n // 10]] + below_1000(n % 10)
+        return [BELOW_20[n // 100], "Hundred"] + below_1000(n % 100)
+
+    words: list[str] = []
+    for value, name in ((10**9, "Billion"), (10**6, "Million"), (1000, "Thousand"), (1, "")):
+        if num >= value:
+            words += below_1000(num // value) + ([name] if name else [])
+            num %= value
+    return " ".join(words)
+
+
+assert number_to_words(123) == "One Hundred Twenty Three"
+assert number_to_words(12345) == "Twelve Thousand Three Hundred Forty Five"
+assert number_to_words(1234567) == "One Million Two Hundred Thirty Four Thousand Five Hundred Sixty Seven"
+assert number_to_words(1000010) == "One Million Ten"
+assert number_to_words(0) == "Zero"
+```
+
+Complexity: O(1) for bounded input.
+F:
+- Add currency formatting ("and 45/100 dollars").
+- Localisation: how would you support British "and" or other languages?
+
+@@ Palindrome Number | Easy | Math
+Q: Return whether an integer reads the same backwards, without converting it to a string.
+
+Example: `121` → `True`, `-121` → `False`, `10` → `False`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: reverse only the second half of the digits and compare with the first half. This avoids overflow in fixed-width languages.
+
+```python
+def is_palindrome_number(x: int) -> bool:
+    if x < 0 or (x % 10 == 0 and x != 0):
+        return False
+    rev = 0
+    while x > rev:
+        rev = rev * 10 + x % 10
+        x //= 10
+    return x == rev or x == rev // 10
+
+
+assert is_palindrome_number(121)
+assert not is_palindrome_number(-121)
+assert not is_palindrome_number(10)
+assert is_palindrome_number(0)
+assert is_palindrome_number(1221)
+```
+
+Complexity: O(log₁₀ n) time, O(1) space.
+F:
+- Why the special case for trailing zeros?
+- Next palindrome greater than n.
+
+@@ Reverse Integer | Medium | Math and overflow
+Q: Reverse the digits of a signed 32-bit integer. Return 0 if the result overflows the 32-bit range.
+
+Example: `123` → `321`, `-123` → `-321`, `1534236469` → `0`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: pop digits with `divmod` on the absolute value and check the bound before pushing. The interviewer usually wants to see the overflow check that other languages need.
+
+```python
+INT_MAX = 2**31 - 1
+
+
+def reverse_integer(x: int) -> int:
+    sign = -1 if x < 0 else 1
+    x, rev = abs(x), 0
+    limit = INT_MAX if sign > 0 else INT_MAX + 1
+    while x:
+        x, d = divmod(x, 10)
+        if rev > (limit - d) // 10:
+            return 0
+        rev = rev * 10 + d
+    return sign * rev
+
+
+assert reverse_integer(123) == 321
+assert reverse_integer(-123) == -321
+assert reverse_integer(120) == 21
+assert reverse_integer(1534236469) == 0
+assert reverse_integer(-2147483412) == -2143847412
+```
+
+Complexity: O(log n).
+
+Python gotcha: `-7 % 10 == 3` and `-7 // 10 == -1` (floor semantics), so work on `abs(x)`.
+F:
+- How does `%` differ between Python and Java or C for negatives?
+- Reverse the bits of a 32-bit integer.
+
+@@ String to Integer (atoi) | Medium | Parsing
+Q: Implement `atoi`: skip leading spaces, read an optional sign, read digits until the first non-digit, and clamp to the 32-bit signed range.
+
+Example: `"   -042"` → `-42`, `"1337c0d3"` → `1337`, `"words 987"` → `0`
+A:
+Seen in: common in bank screens, because it is all about careful input validation.
+
+```python
+def my_atoi(s: str) -> int:
+    i, n = 0, len(s)
+    while i < n and s[i] == " ":
+        i += 1
+    sign = 1
+    if i < n and s[i] in "+-":
+        sign = -1 if s[i] == "-" else 1
+        i += 1
+    num = 0
+    while i < n and "0" <= s[i] <= "9":
+        num = num * 10 + (ord(s[i]) - 48)
+        i += 1
+    return max(-(2**31), min(2**31 - 1, sign * num))
+
+
+assert my_atoi("42") == 42
+assert my_atoi("   -042") == -42
+assert my_atoi("1337c0d3") == 1337
+assert my_atoi("0-1") == 0
+assert my_atoi("words and 987") == 0
+assert my_atoi("-91283472332") == -(2**31)
+assert my_atoi("+-12") == 0
+```
+
+Complexity: O(n).
+
+Gotcha: `str.isdigit()` accepts characters such as `"²"` and other Unicode digits, so compare against `"0"`–`"9"` explicitly.
+F:
+- Stop early on overflow instead of clamping at the end.
+- Write it as a finite-state machine.
+
+@@ Add Strings | Easy | String arithmetic
+Q: Add two non-negative integers given as strings without converting them to integers.
+
+Example: `"456" + "77"` → `"533"`
+A:
+Approach: add digits from the right with a carry, the same way as pen-and-paper.
+
+```python
+def add_strings(a: str, b: str) -> str:
+    i, j, carry, out = len(a) - 1, len(b) - 1, 0, []
+    while i >= 0 or j >= 0 or carry:
+        total = carry
+        if i >= 0:
+            total += ord(a[i]) - 48
+            i -= 1
+        if j >= 0:
+            total += ord(b[j]) - 48
+            j -= 1
+        carry, digit = divmod(total, 10)
+        out.append(chr(48 + digit))
+    return "".join(reversed(out))
+
+
+assert add_strings("11", "123") == "134"
+assert add_strings("456", "77") == "533"
+assert add_strings("0", "0") == "0"
+assert add_strings("999", "1") == "1000"
+```
+
+Complexity: O(max(n, m)).
+F:
+- Add binary strings.
+- Support decimals for money ("12.50" + "0.75"). In production, use `Decimal` or integer minor units.
+
+@@ Multiply Strings | Medium | String arithmetic
+Q: Multiply two non-negative integers given as strings without converting them to integers directly.
+
+Example: `"123" * "456"` → `"56088"`
+A:
+Approach: the product of digits `a[i]` and `b[j]` lands at positions `i+j` (carry) and `i+j+1` (digit) of a result array of length `len(a)+len(b)`.
+
+```python
+import random
+
+
+def multiply(a: str, b: str) -> str:
+    if a == "0" or b == "0":
+        return "0"
+    res = [0] * (len(a) + len(b))
+    for i in range(len(a) - 1, -1, -1):
+        for j in range(len(b) - 1, -1, -1):
+            p = (ord(a[i]) - 48) * (ord(b[j]) - 48) + res[i + j + 1]
+            res[i + j + 1] = p % 10
+            res[i + j] += p // 10
+    return "".join(map(str, res)).lstrip("0") or "0"
+
+
+assert multiply("2", "3") == "6"
+assert multiply("123", "456") == "56088"
+assert multiply("0", "52") == "0"
+rng = random.Random(7)
+for _ in range(200):
+    x, y = rng.randint(0, 10**12), rng.randint(0, 10**12)
+    assert multiply(str(x), str(y)) == str(x * y)
+```
+
+Complexity: O(n·m) time, O(n+m) space. Karatsuba reaches O(n^1.585) for huge inputs.
+
+Testing tip: a randomised comparison against the built-in `int` is a strong and quick check.
+F:
+- Where does Python's `int` switch algorithms? (CPython uses Karatsuba for large ints.)
+- Divide two big-number strings.
+
+@@ Valid Palindrome | Easy | Two pointers
+Q: After lowercasing and removing non-alphanumeric characters, does the string read the same both ways?
+
+Example: `"A man, a plan, a canal: Panama"` → `True`
+A:
+Approach: two pointers that skip non-alphanumerics, comparing case-insensitively. This uses O(1) extra space compared with building a cleaned copy.
+
+```python
+def is_palindrome(s: str) -> bool:
+    i, j = 0, len(s) - 1
+    while i < j:
+        if not s[i].isalnum():
+            i += 1
+        elif not s[j].isalnum():
+            j -= 1
+        else:
+            if s[i].lower() != s[j].lower():
+                return False
+            i, j = i + 1, j - 1
+    return True
+
+
+assert is_palindrome("A man, a plan, a canal: Panama")
+assert not is_palindrome("race a car")
+assert is_palindrome(" ")
+assert is_palindrome("0P") is False
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Unicode-aware version (`casefold()`, normalisation).
+- Allow deleting at most one character.
+
+@@ Valid Palindrome II | Easy | Two pointers
+Q: Return whether `s` can become a palindrome after deleting at most one character.
+
+Example: `"abca"` → `True`, `"abc"` → `False`
+A:
+Approach: move inwards while the ends match. At the first mismatch, try skipping either the left or the right character, and check the rest once.
+
+```python
+def valid_palindrome(s: str) -> bool:
+    def is_pal(i: int, j: int) -> bool:
+        while i < j:
+            if s[i] != s[j]:
+                return False
+            i, j = i + 1, j - 1
+        return True
+
+    i, j = 0, len(s) - 1
+    while i < j:
+        if s[i] != s[j]:
+            return is_pal(i + 1, j) or is_pal(i, j - 1)
+        i, j = i + 1, j - 1
+    return True
+
+
+assert valid_palindrome("aba")
+assert valid_palindrome("abca")
+assert not valid_palindrome("abc")
+assert valid_palindrome("deeee")
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- At most k deletions (DP on the longest palindromic subsequence: `n - LPS ≤ k`).
+- Return which index to delete.
+
+@@ Longest Common Prefix | Easy | Strings
+Q: Return the longest common prefix of a list of strings.
+
+Example: `["flower","flow","flight"]` → `"fl"`
+A:
+Approach: vertical scan. `zip(*strs)` yields the i-th characters of all strings and stops at the shortest string.
+
+```python
+def longest_common_prefix(strs: list[str]) -> str:
+    if not strs:
+        return ""
+    prefix = []
+    for chars in zip(*strs):
+        if len(set(chars)) != 1:
+            break
+        prefix.append(chars[0])
+    return "".join(prefix)
+
+
+assert longest_common_prefix(["flower", "flow", "flight"]) == "fl"
+assert longest_common_prefix(["dog", "racecar", "car"]) == ""
+assert longest_common_prefix(["alone"]) == "alone"
+assert longest_common_prefix([]) == ""
+```
+
+Complexity: O(S) where S is the total number of characters. Another trick: the answer is the common prefix of `min(strs)` and `max(strs)`.
+F:
+- Many queries against a changing set (trie).
+- Why does comparing only the min and max strings work?
+
+@@ Longest Palindromic Substring | Medium | Expand around center
+Q: Return the longest palindromic substring of `s`.
+
+Example: `"babad"` → `"bab"` (or `"aba"`), `"cbbd"` → `"bb"`
+A:
+Seen in: JPMorgan-tagged list (frequent).
+
+Approach: every palindrome has a centre, either a character or a gap between characters, giving 2n-1 centres. Expand each one while the ends match.
+
+```python
+def longest_palindrome(s: str) -> str:
+    start, end = 0, 0
+    for c in range(len(s)):
+        for lo, hi in ((c, c), (c, c + 1)):
+            while lo >= 0 and hi < len(s) and s[lo] == s[hi]:
+                lo, hi = lo - 1, hi + 1
+            if hi - lo - 1 > end - start:
+                start, end = lo + 1, hi
+    return s[start:end]
+
+
+assert longest_palindrome("babad") in ("bab", "aba")
+assert longest_palindrome("cbbd") == "bb"
+assert longest_palindrome("a") == "a"
+assert longest_palindrome("") == ""
+assert longest_palindrome("forgeeksskeegfor") == "geeksskeeg"
+```
+
+Complexity: O(n²) time, O(1) space. Manacher's algorithm is O(n), but it is rarely expected. The DP table is O(n²) space.
+F:
+- Explain Manacher's algorithm at a high level.
+- Longest palindromic subsequence (a different problem: DP).
+
+@@ Palindromic Substrings | Medium | Expand around center
+Q: Count the palindromic substrings of `s`. Substrings at different positions count separately.
+
+Example: `"abc"` → `3`, `"aaa"` → `6`
+A:
+Approach: the same centre expansion. Every successful expansion step is one more palindrome.
+
+```python
+def count_substrings(s: str) -> int:
+    total = 0
+    for c in range(len(s)):
+        for lo, hi in ((c, c), (c, c + 1)):
+            while lo >= 0 and hi < len(s) and s[lo] == s[hi]:
+                total += 1
+                lo, hi = lo - 1, hi + 1
+    return total
+
+
+assert count_substrings("abc") == 3
+assert count_substrings("aaa") == 6
+assert count_substrings("") == 0
+```
+
+Complexity: O(n²) time, O(1) space.
+F:
+- Count only distinct palindromic substrings (a palindromic tree, or a set of hashes).
+- Minimum cuts to partition into palindromes.
+
+@@ Reverse Words in a String | Medium | Strings
+Q: Reverse the order of words, collapsing multiple spaces and trimming the ends.
+
+Example: `"  hello   world  "` → `"world hello"`
+A:
+Approach: `split()` with no argument splits on runs of whitespace and drops empty strings.
+
+```python
+def reverse_words(s: str) -> str:
+    return " ".join(reversed(s.split()))
+
+
+def reverse_words_in_place(chars: list[str]) -> None:
+    """For a mutable char array of single-spaced words: reverse all, then each word."""
+    def rev(i: int, j: int) -> None:
+        while i < j:
+            chars[i], chars[j] = chars[j], chars[i]
+            i, j = i + 1, j - 1
+
+    rev(0, len(chars) - 1)
+    start = 0
+    for i in range(len(chars) + 1):
+        if i == len(chars) or chars[i] == " ":
+            rev(start, i - 1)
+            start = i + 1
+
+
+assert reverse_words("the sky is blue") == "blue is sky the"
+assert reverse_words("  hello world  ") == "world hello"
+assert reverse_words("a good   example") == "example good a"
+cs = list("the sky is blue")
+reverse_words_in_place(cs)
+assert "".join(cs) == "blue is sky the"
+```
+
+Complexity: O(n) time. The in-place version uses O(1) extra space.
+F:
+- Why does `s.split(" ")` behave differently from `s.split()`?
+- Reverse the characters of each word but keep the word order.
+
+@@ Isomorphic Strings | Easy | Hash map
+Q: Two strings are isomorphic if the characters of `s` can be replaced one-to-one to get `t`. Return whether they are.
+
+Example: `"egg","add"` → `True`, `"foo","bar"` → `False`, `"badc","baba"` → `False`
+A:
+Approach: the mapping must be a bijection. Keep maps in both directions, or use the counting trick: the number of distinct pairs must equal the number of distinct characters on each side.
+
+```python
+def is_isomorphic(s: str, t: str) -> bool:
+    if len(s) != len(t):
+        return False
+    s_to_t: dict[str, str] = {}
+    t_to_s: dict[str, str] = {}
+    for a, b in zip(s, t):
+        if s_to_t.setdefault(a, b) != b or t_to_s.setdefault(b, a) != a:
+            return False
+    return True
+
+
+assert is_isomorphic("egg", "add")
+assert not is_isomorphic("foo", "bar")
+assert is_isomorphic("paper", "title")
+assert not is_isomorphic("badc", "baba")
+```
+
+Complexity: O(n) time, O(k) space.
+F:
+- Group a list of words by isomorphism pattern (map each word to a first-occurrence index tuple).
+- Word Pattern.
+
+@@ Word Pattern | Easy | Hash map
+Q: Does string `s` follow `pattern`, with a bijection between pattern letters and words?
+
+Example: `"abba", "dog cat cat dog"` → `True`, `"abba", "dog dog dog dog"` → `False`
+A:
+Approach: the same as isomorphic strings, but over words. Check the lengths first.
+
+```python
+def word_pattern(pattern: str, s: str) -> bool:
+    words = s.split()
+    if len(pattern) != len(words):
+        return False
+    return len(set(pattern)) == len(set(words)) == len(set(zip(pattern, words)))
+
+
+assert word_pattern("abba", "dog cat cat dog")
+assert not word_pattern("abba", "dog cat cat fish")
+assert not word_pattern("aaaa", "dog cat cat dog")
+assert not word_pattern("abba", "dog dog dog dog")
+assert not word_pattern("aaa", "aa aa aa aa")
+```
+
+Complexity: O(n) time and space.
+
+Why the counting trick works: the mapping is a bijection exactly when the number of distinct pairs equals the number of distinct letters and the number of distinct words.
+F:
+- Word Pattern II: no spaces, so words must be found by backtracking.
+- Explain the counting trick to someone reviewing your code.
+
+@@ Ransom Note | Easy | Counting
+Q: Can `ransom_note` be built from the letters of `magazine`, using each letter at most once?
+
+Example: `"aa","aab"` → `True`, `"aa","ab"` → `False`
+A:
+```python
+from collections import Counter
+
+
+def can_construct(ransom_note: str, magazine: str) -> bool:
+    need = Counter(ransom_note)
+    need.subtract(Counter(magazine))
+    return all(v <= 0 for v in need.values())
+
+
+assert not can_construct("a", "b")
+assert not can_construct("aa", "ab")
+assert can_construct("aa", "aab")
+assert can_construct("", "x")
+```
+
+Complexity: O(n + m) time, O(k) space. On Python 3.10+, `Counter(ransom_note) <= Counter(magazine)` also works.
+F:
+- The magazine is a stream and you want to stop early once everything is satisfied (count remaining needs).
+- Letters have per-letter costs; minimise the total cost.
+
+@@ Minimum Steps to Make Two Strings Anagram | Medium | Counting
+Q: Given equal-length `s` and `t`, one step replaces any character of `t`. Return the minimum number of steps to make `t` an anagram of `s`.
+
+Example: `"leetcode","practice"` → `5`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: each character that `s` needs more of than `t` has must be produced by one replacement. The answer is the sum of the positive parts of `count_s - count_t`.
+
+```python
+from collections import Counter
+
+
+def min_steps(s: str, t: str) -> int:
+    return sum((Counter(s) - Counter(t)).values())
+
+
+assert min_steps("bab", "aba") == 1
+assert min_steps("leetcode", "practice") == 5
+assert min_steps("anagram", "mangaar") == 0
+```
+
+Complexity: O(n) time, O(1) space for a fixed alphabet.
+
+Note: `Counter` subtraction keeps only positive counts, which is exactly the semantics needed here.
+F:
+- Lengths can differ, and both insertions and deletions are allowed.
+- Which characters do you need to change? (Return the multiset.)
+
+@@ Find Resultant Array After Removing Anagrams | Easy | Strings
+Q: Repeatedly delete `words[i]` if it is an anagram of `words[i-1]` in the current array. Return the final array.
+
+Example: `["abba","baba","bbaa","cd","cd"]` → `["abba","cd"]`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: keep a result list and compare each word with the last kept word. This is equivalent to the repeated deletion because deletions only ever remove the later word.
+
+```python
+def remove_anagrams(words: list[str]) -> list[str]:
+    out: list[str] = []
+    last_key = None
+    for w in words:
+        key = "".join(sorted(w))
+        if key != last_key:
+            out.append(w)
+            last_key = key
+    return out
+
+
+assert remove_anagrams(["abba", "baba", "bbaa", "cd", "cd"]) == ["abba", "cd"]
+assert remove_anagrams(["a", "b", "c", "d", "e"]) == ["a", "b", "c", "d", "e"]
+assert remove_anagrams(["a", "b", "a"]) == ["a", "b", "a"]
+```
+
+Complexity: O(n · k log k) for word length k.
+F:
+- Remove all anagrams that appeared anywhere earlier (use a set of keys).
+- Why is the order of deletions irrelevant?
+
+@@ Count Binary Substrings | Easy | Run length
+Q: Count the non-empty substrings with equal numbers of consecutive 0s and 1s, where all the 0s and all the 1s are grouped together.
+
+Example: `"00110011"` → `6`, `"10101"` → `4`
+A:
+Seen in: JPMorgan-tagged list (high frequency).
+
+Approach: compress into group lengths. Two adjacent groups of lengths `p` and `c` contribute `min(p, c)` substrings.
+
+```python
+def count_binary_substrings(s: str) -> int:
+    prev, cur, total = 0, 1, 0
+    for i in range(1, len(s)):
+        if s[i] == s[i - 1]:
+            cur += 1
+        else:
+            total += min(prev, cur)
+            prev, cur = cur, 1
+    return total + min(prev, cur) if s else 0
+
+
+assert count_binary_substrings("00110011") == 6
+assert count_binary_substrings("10101") == 4
+assert count_binary_substrings("0") == 0
+assert count_binary_substrings("") == 0
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Explain why each adjacent pair contributes `min(p, c)`.
+- Generalise to strings over three symbols.
+
+@@ Break a Palindrome | Medium | Greedy
+Q: Change exactly one character of a lowercase palindrome so the result is not a palindrome and is lexicographically smallest. Return `""` if that's impossible.
+
+Example: `"abccba"` → `"aaccba"`, `"a"` → `""`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: in the first half, change the first non-`a` to `a`. If the first half is all `a`, change the last character to `b`. The middle character of an odd-length palindrome is skipped, because changing it keeps the string a palindrome.
+
+```python
+def break_palindrome(p: str) -> str:
+    if len(p) == 1:
+        return ""
+    for i in range(len(p) // 2):
+        if p[i] != "a":
+            return p[:i] + "a" + p[i + 1:]
+    return p[:-1] + "b"
+
+
+assert break_palindrome("abccba") == "aaccba"
+assert break_palindrome("a") == ""
+assert break_palindrome("aa") == "ab"
+assert break_palindrome("aba") == "abb"
+```
+
+Complexity: O(n).
+F:
+- Make it lexicographically largest instead.
+- Why skip the middle character?
+
+@@ Minimum Swaps to Make Strings Equal | Medium | Greedy counting
+Q: Strings `s1` and `s2` of equal length contain only `x` and `y`. You may swap `s1[i]` with `s2[j]`. Return the minimum number of swaps to make them equal, or `-1`.
+
+Example: `"xx","yy"` → `1`, `"xy","yx"` → `2`, `"xx","xy"` → `-1`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: count mismatches of type `xy` (s1 has x, s2 has y) and `yx`. Two `xy` mismatches fix with one swap, and the same goes for two `yx`. One leftover `xy` plus one leftover `yx` needs two swaps. An odd total is impossible.
+
+```python
+def minimum_swap(s1: str, s2: str) -> int:
+    xy = sum(a == "x" and b == "y" for a, b in zip(s1, s2))
+    yx = sum(a == "y" and b == "x" for a, b in zip(s1, s2))
+    if (xy + yx) % 2:
+        return -1
+    return xy // 2 + yx // 2 + 2 * (xy % 2)
+
+
+assert minimum_swap("xx", "yy") == 1
+assert minimum_swap("xy", "yx") == 2
+assert minimum_swap("xx", "xy") == -1
+assert minimum_swap("xxyyxyxyxx", "xyyxyxxxyx") == 4
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Why is an odd number of mismatches impossible?
+- Return the actual swap sequence.
+
+@@ Check if Number Has Equal Digit Count and Digit Value | Easy | Counting
+Q: For a digit string `num`, return `True` if, for every index i, the digit i occurs exactly `int(num[i])` times.
+
+Example: `"1210"` → `True`, `"030"` → `False`
+A:
+Seen in: JPMorgan-tagged list.
+
+```python
+from collections import Counter
+
+
+def digit_count(num: str) -> bool:
+    counts = Counter(num)
+    return all(counts[str(i)] == int(d) for i, d in enumerate(num))
+
+
+assert digit_count("1210")
+assert not digit_count("030")
+assert digit_count("2020")
+```
+
+Complexity: O(n).
+F:
+- Generate all self-describing numbers of length n.
+
+@@ Lexicographically Smallest String After a Swap | Easy | Greedy
+Q: Given a digit string, you may swap one pair of adjacent digits with the same parity (both odd or both even), at most once. Return the lexicographically smallest result.
+
+Example: `"45320"` → `"43520"`, `"001"` → `"001"`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: the earliest improvement wins lexicographically. Swap at the first i where the digits share a parity and `s[i] > s[i+1]`.
+
+```python
+def get_smallest_string(s: str) -> str:
+    for i in range(len(s) - 1):
+        a, b = int(s[i]), int(s[i + 1])
+        if a % 2 == b % 2 and a > b:
+            return s[:i] + s[i + 1] + s[i] + s[i + 2:]
+    return s
+
+
+assert get_smallest_string("45320") == "43520"
+assert get_smallest_string("001") == "001"
+assert get_smallest_string("20") == "02"
+```
+
+Complexity: O(n).
+F:
+- Unlimited swaps (sort each run of same-parity digits).
+
+@@ Slowest Key | Easy | Single pass
+Q: `release_times[i]` is when the i-th key was released, and the first press starts at time 0. Return the key with the longest press duration, breaking ties by the lexicographically largest key.
+
+Example: `[9,29,49,50], "cbcd"` → `"c"`
+A:
+Seen in: JPMorgan-tagged list. The newer "Button with Longest Push Time" variant is the same pattern.
+
+```python
+def slowest_key(release_times: list[int], keys: str) -> str:
+    best_d, best_k = release_times[0], keys[0]
+    for i in range(1, len(keys)):
+        d = release_times[i] - release_times[i - 1]
+        if d > best_d or (d == best_d and keys[i] > best_k):
+            best_d, best_k = d, keys[i]
+    return best_k
+
+
+assert slowest_key([9, 29, 49, 50], "cbcd") == "c"
+assert slowest_key([12, 23, 36, 46, 62], "spuda") == "a"
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- What if presses can overlap (you have explicit press and release events)?
+
+@@ Determine Color of a Chessboard Square | Easy | Math
+Q: Given a coordinate like `"a1"`, return `True` if the square is white.
+
+Example: `"a1"` → `False`, `"h3"` → `True`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: a1 is black, and colours alternate, so the square is white when the file index plus the rank is odd.
+
+```python
+def square_is_white(coordinates: str) -> bool:
+    file_index = ord(coordinates[0]) - ord("a") + 1
+    rank = int(coordinates[1])
+    return (file_index + rank) % 2 == 1
+
+
+assert square_is_white("a1") is False
+assert square_is_white("h3") is True
+assert square_is_white("c7") is False
+```
+
+Complexity: O(1).
+F:
+- Do two squares have the same colour?
+- Validate the input format.
+
+@@ Minimum Time to Type Word Using Special Typewriter | Easy | Circular distance
+Q: A circular typewriter has a–z with the pointer starting at `a`. Moving one step either way costs 1 second and typing costs 1 second. Return the minimum time to type `word`.
+
+Example: `"bza"` → `7`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: for each character, add `min(d, 26 - d)` for the circular distance plus 1 to type it.
+
+```python
+def min_time_to_type(word: str) -> int:
+    total, cur = len(word), "a"
+    for ch in word:
+        d = abs(ord(ch) - ord(cur))
+        total += min(d, 26 - d)
+        cur = ch
+    return total
+
+
+assert min_time_to_type("abc") == 5
+assert min_time_to_type("bza") == 7
+assert min_time_to_type("zjpc") == 34
+```
+
+Complexity: O(n).
+F:
+- Two pointers (two fingers): choose which one moves (DP).
+
+@@ Construct String With Repeat Limit | Medium | Greedy with heap
+Q: Using the characters of `s` (not necessarily all of them), build the lexicographically largest string in which no character appears more than `repeat_limit` times in a row.
+
+Example: `"cczazcc", 3` → `"zzcccac"`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: a max-heap of characters. Take as many copies of the largest as allowed. If some remain, insert one copy of the next largest as a separator and then continue. If there is no separator, stop.
+
+```python
+import heapq
+from collections import Counter
+
+
+def repeat_limited_string(s: str, repeat_limit: int) -> str:
+    counts = Counter(s)
+    heap = [-ord(ch) for ch in counts]
+    heapq.heapify(heap)
+    out: list[str] = []
+    while heap:
+        ch = chr(-heapq.heappop(heap))
+        take = min(repeat_limit, counts[ch])
+        out.append(ch * take)
+        counts[ch] -= take
+        if counts[ch] == 0:
+            continue
+        if not heap:
+            break
+        sep = chr(-heapq.heappop(heap))
+        out.append(sep)
+        counts[sep] -= 1
+        if counts[sep]:
+            heapq.heappush(heap, -ord(sep))
+        heapq.heappush(heap, -ord(ch))
+    return "".join(out)
+
+
+assert repeat_limited_string("cczazcc", 3) == "zzcccac"
+assert repeat_limited_string("aababab", 2) == "bbabaa"
+assert repeat_limited_string("aaa", 1) == "a"
+```
+
+Complexity: O(n log k) for k distinct characters. A 26-slot array scan also works in O(26n).
+F:
+- Reorganise a string so no two adjacent characters are equal.
+- Why use only one separator character instead of many?
+
+@@ Display Table of Food Orders in a Restaurant | Medium | Hash map aggregation
+Q: `orders[i] = [customer, table, item]`. Return a display table: a header `["Table", items sorted alphabetically...]`, then one row per table (sorted numerically) with a count for each item, as strings.
+A:
+Seen in: JPMorgan-tagged list. It is essentially a pivot table, a very common reporting task.
+
+```python
+from collections import Counter, defaultdict
+
+
+def display_table(orders: list[list[str]]) -> list[list[str]]:
+    items = sorted({item for _, _, item in orders})
+    tables: dict[int, Counter] = defaultdict(Counter)
+    for _, table, item in orders:
+        tables[int(table)][item] += 1
+    rows = [["Table", *items]]
+    for t in sorted(tables):
+        rows.append([str(t), *(str(tables[t][item]) for item in items)])
+    return rows
+
+
+orders = [["David", "3", "Ceviche"], ["Corina", "10", "Beef Burrito"], ["David", "3", "Fried Chicken"],
+          ["Carla", "5", "Water"], ["Carla", "5", "Ceviche"], ["Rous", "3", "Ceviche"]]
+assert display_table(orders) == [
+    ["Table", "Beef Burrito", "Ceviche", "Fried Chicken", "Water"],
+    ["3", "0", "2", "1", "0"],
+    ["5", "0", "1", "0", "1"],
+    ["10", "1", "0", "0", "0"],
+]
+```
+
+Complexity: O(n + T·I + I log I + T log T) for T tables and I items.
+
+Pitfall: sorting table numbers as strings puts "10" before "3".
+F:
+- Write it as SQL (`GROUP BY table, item` plus a pivot).
+- Stream orders in and keep the table updated incrementally.
+
+@@ String Compression | Medium | Two pointers
+Q: Compress a list of characters in place: each run becomes the character followed by its count (only if the count is more than 1). Return the new length.
+
+Example: `["a","a","b","b","c","c","c"]` → `6` (`["a","2","b","2","c","3"]`)
+A:
+Approach: a read pointer finds each run and a write pointer emits the character and its count digits. Because `w ≤ i` always holds, nothing unread is overwritten.
+
+```python
+def compress(chars: list[str]) -> int:
+    w = i = 0
+    while i < len(chars):
+        j = i
+        while j < len(chars) and chars[j] == chars[i]:
+            j += 1
+        chars[w] = chars[i]
+        w += 1
+        if j - i > 1:
+            for d in str(j - i):
+                chars[w] = d
+                w += 1
+        i = j
+    return w
+
+
+a = list("aabbccc")
+assert compress(a) == 6 and a[:6] == ["a", "2", "b", "2", "c", "3"]
+b = ["a"]
+assert compress(b) == 1
+c = ["a"] + ["b"] * 12
+assert compress(c) == 4 and c[:4] == ["a", "b", "1", "2"]
+```
+
+Complexity: O(n) time, O(1) extra space.
+F:
+- Decompress the result.
+- When does compression make the output longer, and how would you guard against it?
+
+@@ Encode and Decode Strings | Medium | Serialization
+Q: Design `encode(list[str]) -> str` and `decode(str) -> list[str]` so any list of strings (containing any characters, including your delimiter) survives the round trip.
+A:
+Approach: length-prefix framing, `"<len>#<payload>"`. The decoder reads digits up to `#` and then takes exactly `len` characters, so the payload can contain `#` or anything else. This is the same idea as HTTP `Content-Length` or Kafka record framing.
+
+```python
+def encode(strs: list[str]) -> str:
+    return "".join(f"{len(s)}#{s}" for s in strs)
+
+
+def decode(data: str) -> list[str]:
+    out, i = [], 0
+    while i < len(data):
+        j = data.index("#", i)
+        n = int(data[i:j])
+        out.append(data[j + 1:j + 1 + n])
+        i = j + 1 + n
+    return out
+
+
+for case in (["lint", "code", "love", "you"], ["", "a#b", "12#", "#"], [], ["héllo", "😀"]):
+    assert decode(encode(case)) == case
+```
+
+Complexity: O(total length) for both.
+
+Why not a plain delimiter: an escape scheme is error-prone, and length prefixes are simple to parse and robust.
+F:
+- Make it byte-oriented for a network protocol (fixed 4-byte big-endian lengths).
+- How do you handle corrupt input safely? (Validate lengths and raise a clear error.)
+
+@@ Zigzag Conversion | Medium | Simulation
+Q: Write `s` in a zigzag over `num_rows` rows, then read it row by row.
+
+Example: `"PAYPALISHIRING", 3` → `"PAHNAPLSIIGYIR"`
+A:
+Approach: walk the rows down and back up, appending each character to its row.
+
+```python
+def convert(s: str, num_rows: int) -> str:
+    if num_rows == 1 or num_rows >= len(s):
+        return s
+    rows: list[list[str]] = [[] for _ in range(num_rows)]
+    r, step = 0, 1
+    for ch in s:
+        rows[r].append(ch)
+        if r == 0:
+            step = 1
+        elif r == num_rows - 1:
+            step = -1
+        r += step
+    return "".join("".join(row) for row in rows)
+
+
+assert convert("PAYPALISHIRING", 3) == "PAHNAPLSIIGYIR"
+assert convert("PAYPALISHIRING", 4) == "PINALSIGYAHRPI"
+assert convert("A", 1) == "A"
+```
+
+Complexity: O(n) time and space.
+F:
+- Compute the output directly with index arithmetic (cycle length `2*num_rows - 2`).
+
+@@ Count and Say | Medium | Run-length encoding
+Q: `count_and_say(1) = "1"`, and each later term reads the previous one aloud ("1" → one 1 → "11" → two 1s → "21" → "1211" ...). Return the n-th term.
+A:
+Approach: repeated run-length encoding with `itertools.groupby`.
+
+```python
+from itertools import groupby
+
+
+def count_and_say(n: int) -> str:
+    s = "1"
+    for _ in range(n - 1):
+        s = "".join(f"{len(list(g))}{d}" for d, g in groupby(s))
+    return s
+
+
+assert count_and_say(1) == "1"
+assert count_and_say(4) == "1211"
+assert count_and_say(5) == "111221"
+```
+
+Complexity: output length grows by about 1.3× per step (Conway's constant), so the total is O(sum of lengths).
+F:
+- Implement run-length encoding and decoding for arbitrary strings.
+- Why can no digit greater than 3 ever appear?
+
+@@ Sort Characters By Frequency | Medium | Counting and sorting
+Q: Sort a string by decreasing character frequency.
+
+Example: `"tree"` → `"eert"` or `"eetr"`
+A:
+Approach: count with `Counter` and emit characters in `most_common()` order. Bucket sort by frequency brings it to O(n).
+
+```python
+from collections import Counter
+
+
+def frequency_sort(s: str) -> str:
+    return "".join(ch * cnt for ch, cnt in Counter(s).most_common())
+
+
+assert frequency_sort("tree") in ("eert", "eetr")
+assert frequency_sort("cccaaa") in ("cccaaa", "aaaccc")
+assert frequency_sort("Aabb") in ("bbAa", "bbaA")
+```
+
+Complexity: O(n + k log k) for k distinct characters.
+F:
+- Make tie-breaking deterministic (sort by `(-count, char)`).
+- Stable order by first appearance for ties.
+
+@@ Custom Sort String | Medium | Counting
+Q: `order` contains unique characters. Permute `s` so characters follow the order given in `order`. Characters not in `order` can go anywhere.
+
+Example: `order = "cba", s = "abcd"` → `"cbad"`
+A:
+Approach: count `s`, emit the characters of `order` by count, then append whatever remains.
+
+```python
+from collections import Counter
+
+
+def custom_sort_string(order: str, s: str) -> str:
+    counts = Counter(s)
+    out = [ch * counts.pop(ch, 0) for ch in order]
+    out.extend(ch * n for ch, n in counts.items())
+    return "".join(out)
+
+
+assert custom_sort_string("cba", "abcd") == "cbad"
+assert custom_sort_string("bcafg", "abcd") == "bcad"
+assert custom_sort_string("", "xyz") == "xyz"
+```
+
+Complexity: O(|order| + |s|). Alternatively, `sorted(s, key=rank.get)` costs O(n log n).
+F:
+- Sort a list of records by a custom priority list, such as account types in business order.
+
+@@ Minimum Operations to Make All Array Elements Equal | Medium | Prefix sums and binary search
+Q: For each query `q`, return the minimum number of ±1 operations to make every element of `nums` equal to `q`, which is `sum(|x - q|)`.
+
+Example: `nums = [3,1,6,8], queries = [1,5]` → `[14, 10]`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: sort and build prefix sums. For each query, `bisect` gives k elements below q. The cost is `q*k - prefix[k] + (total - prefix[k]) - q*(n-k)`.
+
+```python
+from bisect import bisect_left
+from itertools import accumulate
+
+
+def min_operations(nums: list[int], queries: list[int]) -> list[int]:
+    a = sorted(nums)
+    prefix = [0, *accumulate(a)]
+    n, total = len(a), prefix[-1]
+    out = []
+    for q in queries:
+        k = bisect_left(a, q)
+        out.append(q * k - prefix[k] + (total - prefix[k]) - q * (n - k))
+    return out
+
+
+assert min_operations([3, 1, 6, 8], [1, 5]) == [14, 10]
+assert min_operations([2, 9, 6, 3], [10]) == [20]
+```
+
+Complexity: O((n + m) log n) versus O(n·m) brute force.
+F:
+- Which q minimises the total? (The median.)
+- Support updates to `nums` between queries (Fenwick tree over values).
+
+@@ Find Occurrences of an Element in an Array | Medium | Precomputation
+Q: For each `queries[i]`, return the index of the `queries[i]`-th occurrence of `x` in `nums` (1-based count), or `-1` if there are fewer occurrences.
+
+Example: `nums = [1,3,1,7], queries = [1,3,2,4], x = 1` → `[0,-1,2,-1]`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: precompute the positions of `x` once, so each query is O(1).
+
+```python
+def occurrences_of_element(nums: list[int], queries: list[int], x: int) -> list[int]:
+    positions = [i for i, v in enumerate(nums) if v == x]
+    return [positions[q - 1] if 1 <= q <= len(positions) else -1 for q in queries]
+
+
+assert occurrences_of_element([1, 3, 1, 7], [1, 3, 2, 4], 1) == [0, -1, 2, -1]
+assert occurrences_of_element([1, 2, 3], [10], 5) == [-1]
+```
+
+Complexity: O(n + m).
+F:
+- Queries for many different x values (a dict of position lists).
+- The array changes between queries.
+
+@@ Taking Maximum Energy From the Mystic Dungeon | Medium | Suffix DP
+Q: Starting at any index i, you absorb `energy[i]`, then jump to `i+k`, `i+2k`, ... until you pass the end. Return the maximum total energy.
+
+Example: `energy = [5,2,-10,-5,1], k = 3` → `3` (start at index 1: 2 + 1)
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: `dp[i] = energy[i] + dp[i+k]`, filled from the right. The answer is `max(dp)`.
+
+```python
+def maximum_energy(energy: list[int], k: int) -> int:
+    dp = energy[:]
+    for i in range(len(dp) - k - 1, -1, -1):
+        dp[i] += dp[i + k]
+    return max(dp)
+
+
+assert maximum_energy([5, 2, -10, -5, 1], 3) == 3
+assert maximum_energy([-2, -3, -1], 2) == -1
+assert maximum_energy([4], 1) == 4
+```
+
+Complexity: O(n) time. It can be done in place for O(1) extra space.
+F:
+- Must start within the first k indices.
+- Why is the brute force O(n²/k)?
+
+@@ Minimum Processing Time | Medium | Greedy sorting
+Q: There are n processors, each with 4 cores. `processor_time[i]` is when processor i becomes available. There are exactly 4n tasks, and each core runs one task. Return the minimum time at which all tasks finish.
+
+Example: `processor_time = [8,10], tasks = [2,2,3,1,8,7,4,5]` → `16`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: give the longest tasks to the earliest processors. Sort processors ascending and tasks descending. Processor i gets tasks `4i..4i+3`, and its finish time is `processor_time[i] + tasks[4i]` (its largest task).
+
+```python
+def min_processing_time(processor_time: list[int], tasks: list[int]) -> int:
+    procs = sorted(processor_time)
+    ts = sorted(tasks, reverse=True)
+    return max(p + ts[4 * i] for i, p in enumerate(procs))
+
+
+assert min_processing_time([8, 10], [2, 2, 3, 1, 8, 7, 4, 5]) == 16
+assert min_processing_time([10, 20], [2, 3, 1, 2, 5, 8, 4, 3]) == 23
+```
+
+Complexity: O(n log n + t log t).
+
+Exchange argument: swapping a long task onto a later processor can only increase that processor's finish time.
+F:
+- Cores are not all equal.
+- Tasks arrive online (a heap of the earliest-free cores).
+
+@@ Shuffle an Array | Medium | Fisher-Yates
+Q: Implement `Solution(nums)` with `reset()` returning the original array and `shuffle()` returning a uniformly random permutation.
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: Fisher-Yates. For i from n-1 down to 1, swap with a random j in `[0, i]`. Every one of the n! permutations is equally likely. Injecting the RNG makes it testable.
+
+```python
+import random
+from collections import Counter
+
+
+class Shuffler:
+    def __init__(self, nums: list[int], rng: random.Random | None = None) -> None:
+        self._original = list(nums)
+        self._rng = rng or random.Random()
+
+    def reset(self) -> list[int]:
+        return list(self._original)
+
+    def shuffle(self) -> list[int]:
+        a = list(self._original)
+        for i in range(len(a) - 1, 0, -1):
+            j = self._rng.randint(0, i)
+            a[i], a[j] = a[j], a[i]
+        return a
+
+
+s = Shuffler([1, 2, 3], random.Random(42))
+assert sorted(s.shuffle()) == [1, 2, 3]
+assert s.reset() == [1, 2, 3]
+counts = Counter(tuple(s.shuffle()) for _ in range(60_000))
+assert len(counts) == 6 and all(8_000 < c < 12_000 for c in counts.values())
+```
+
+Complexity: O(n) per shuffle.
+
+Classic bug: `j = randint(0, n-1)` for every i gives a biased distribution (n^n outcomes do not divide evenly into n! permutations).
+F:
+- Why is the naive "swap with any index" biased?
+- Use `secrets.SystemRandom` when unpredictability matters (for example, raffles).
+
+@@ Find Pivot Index | Easy | Prefix sums
+Q: Return the leftmost index where the sum of the elements to its left equals the sum of the elements to its right, or `-1`.
+
+Example: `[1,7,3,6,5,6]` → `3`
+A:
+Approach: left sum plus running total. At index i, the right sum is `total - left - nums[i]`.
+
+```python
+def pivot_index(nums: list[int]) -> int:
+    total, left = sum(nums), 0
+    for i, x in enumerate(nums):
+        if left == total - left - x:
+            return i
+        left += x
+    return -1
+
+
+assert pivot_index([1, 7, 3, 6, 5, 6]) == 3
+assert pivot_index([1, 2, 3]) == -1
+assert pivot_index([2, 1, -1]) == 0
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Return all pivot indices.
+- Split an array into three parts with equal sums.
+
+@@ Degree of an Array | Easy | Hash map
+Q: The degree is the maximum frequency of any element. Return the length of the shortest contiguous subarray with the same degree as the whole array.
+
+Example: `[1,2,2,3,1]` → `2`
+A:
+Approach: for each value, record its count and its first and last index. Among values with the maximum count, take the minimum span.
+
+```python
+def find_shortest_sub_array(nums: list[int]) -> int:
+    first: dict[int, int] = {}
+    count: dict[int, int] = {}
+    best_degree, best_len = 0, 0
+    for i, x in enumerate(nums):
+        first.setdefault(x, i)
+        count[x] = count.get(x, 0) + 1
+        span = i - first[x] + 1
+        if count[x] > best_degree or (count[x] == best_degree and span < best_len):
+            best_degree, best_len = count[x], span
+    return best_len
+
+
+assert find_shortest_sub_array([1, 2, 2, 3, 1]) == 2
+assert find_shortest_sub_array([1, 2, 2, 3, 1, 4, 2]) == 6
+assert find_shortest_sub_array([5]) == 1
+```
+
+Complexity: O(n) in a single pass.
+F:
+- Return the subarray itself.
+
+@@ Subdomain Visit Count | Medium | Hash map aggregation
+Q: Each entry is `"count domain"`, for example `"9001 discuss.leetcode.com"`. A visit to a domain also counts for every parent domain. Return `"count domain"` for all domains.
+A:
+Approach: for each entry, walk the parent suffixes by splitting on dots and accumulate counts in a Counter.
+
+```python
+from collections import Counter
+
+
+def subdomain_visits(cpdomains: list[str]) -> list[str]:
+    totals: Counter[str] = Counter()
+    for entry in cpdomains:
+        count_str, domain = entry.split()
+        parts = domain.split(".")
+        for i in range(len(parts)):
+            totals[".".join(parts[i:])] += int(count_str)
+    return [f"{c} {d}" for d, c in totals.items()]
+
+
+out = subdomain_visits(["9001 discuss.leetcode.com"])
+assert sorted(out) == ["9001 com", "9001 discuss.leetcode.com", "9001 leetcode.com"]
+out = subdomain_visits(["900 google.mail.com", "50 yahoo.com", "1 intel.mail.com", "5 wiki.org"])
+assert "951 com" in out and "901 mail.com" in out and "5 org" in out
+```
+
+Complexity: O(total characters).
+F:
+- Aggregate this across a log stream with late-arriving data.
+- Top-10 domains per hour.
+
+@@ Unique Email Addresses | Easy | String normalization
+Q: In the local name, dots are ignored and everything after `+` is ignored. The domain is kept as-is. Count the distinct addresses that actually receive mail.
+
+Example: `["test.email+alex@leetcode.com","test.e.mail+bob.cathy@leetcode.com","testemail+david@lee.tcode.com"]` → `2`
+A:
+Approach: normalise each address into a canonical key and count them with a set. This is a data-quality pattern that shows up in KYC and de-duplication work.
+
+```python
+def num_unique_emails(emails: list[str]) -> int:
+    seen: set[str] = set()
+    for e in emails:
+        local, domain = e.rsplit("@", 1)
+        local = local.split("+", 1)[0].replace(".", "")
+        seen.add(f"{local}@{domain.lower()}")
+    return len(seen)
+
+
+assert num_unique_emails(["test.email+alex@leetcode.com", "test.e.mail+bob.cathy@leetcode.com",
+                          "testemail+david@lee.tcode.com"]) == 2
+assert num_unique_emails(["a@leetcode.com", "b@leetcode.com", "c@leetcode.com"]) == 3
+```
+
+Complexity: O(total length).
+
+Note: lowercasing the domain is safe because domains are case-insensitive. Local parts are technically case-sensitive, so follow the spec in the question.
+F:
+- Where would you put this normalisation in a real system (ingest time versus query time)?
+
+@@ Find Common Characters | Easy | Counting
+Q: Return every character that appears in all strings, including duplicates.
+
+Example: `["bella","label","roller"]` → `["e","l","l"]`
+A:
+Approach: take the intersection of the Counters (minimum counts) across all words.
+
+```python
+from collections import Counter
+from functools import reduce
+
+
+def common_chars(words: list[str]) -> list[str]:
+    common = reduce(lambda acc, w: acc & Counter(w), words[1:], Counter(words[0]))
+    return sorted(common.elements())
+
+
+assert common_chars(["bella", "label", "roller"]) == ["e", "l", "l"]
+assert common_chars(["cool", "lock", "cook"]) == ["c", "o"]
+```
+
+Complexity: O(total characters).
+F:
+- Characters present in at least half of the words.
+
+@@ Longest Harmonious Subsequence | Easy | Counting
+Q: A harmonious array has max - min exactly 1. Return the length of the longest harmonious subsequence.
+
+Example: `[1,3,2,2,5,2,3,7]` → `5` (`[3,2,2,2,3]`)
+A:
+Approach: order doesn't matter for a subsequence, so count values and check each `x` against `x+1`.
+
+```python
+from collections import Counter
+
+
+def find_lhs(nums: list[int]) -> int:
+    c = Counter(nums)
+    return max((c[x] + c[x + 1] for x in c if x + 1 in c), default=0)
+
+
+assert find_lhs([1, 3, 2, 2, 5, 2, 3, 7]) == 5
+assert find_lhs([1, 2, 3, 4]) == 2
+assert find_lhs([1, 1, 1, 1]) == 0
+```
+
+Complexity: O(n).
+F:
+- Contiguous subarray version (sliding window with a monotonic deque).
+
+@@ Bulls and Cows | Medium | Counting
+Q: Return the hint `"xAyB"`: x = digits correct in value and position (bulls), and y = digits correct in value but in the wrong position (cows).
+
+Example: `secret = "1807", guess = "7810"` → `"1A3B"`
+A:
+Approach: bulls are positional matches. The total number of common digits is the Counter intersection, so cows = common - bulls.
+
+```python
+from collections import Counter
+
+
+def get_hint(secret: str, guess: str) -> str:
+    bulls = sum(a == b for a, b in zip(secret, guess))
+    common = sum((Counter(secret) & Counter(guess)).values())
+    return f"{bulls}A{common - bulls}B"
+
+
+assert get_hint("1807", "7810") == "1A3B"
+assert get_hint("1123", "0111") == "1A1B"
+assert get_hint("1", "1") == "1A0B"
+```
+
+Complexity: O(n).
+F:
+- Write a solver that minimises the number of guesses (Mastermind strategy).
+
+@@ Brick Wall | Medium | Hash map
+Q: Each row of a wall is a list of brick widths, and all rows have the same total width. Draw one vertical line that crosses the fewest bricks. Return that number.
+
+Example: `[[1,2,2,1],[3,1,2],[1,3,2],[2,4],[3,1,2],[1,3,1,1]]` → `2`
+A:
+Approach: count the edge positions (prefix sums, excluding the wall's end). The line should go through the most common edge, so the answer is `rows - max_edge_count`.
+
+```python
+from collections import Counter
+from itertools import accumulate
+
+
+def least_bricks(wall: list[list[int]]) -> int:
+    edges: Counter[int] = Counter()
+    for row in wall:
+        edges.update(list(accumulate(row))[:-1])
+    return len(wall) - max(edges.values(), default=0)
+
+
+assert least_bricks([[1, 2, 2, 1], [3, 1, 2], [1, 3, 2], [2, 4], [3, 1, 2], [1, 3, 1, 1]]) == 2
+assert least_bricks([[1], [1], [1]]) == 3
+```
+
+Complexity: O(total bricks).
+F:
+- Return the x-coordinate of the best line.
+
+@@ Pairs of Songs With Total Durations Divisible by 60 | Medium | Remainder counting
+Q: Count the pairs `i < j` with `(time[i] + time[j]) % 60 == 0`.
+
+Example: `[30,20,150,100,40]` → `3`
+A:
+Approach: this is Two Sum on remainders. For each t, add the count of previous remainders equal to `(60 - t % 60) % 60`.
+
+```python
+def num_pairs_divisible_by_60(time: list[int]) -> int:
+    counts = [0] * 60
+    total = 0
+    for t in time:
+        r = t % 60
+        total += counts[(60 - r) % 60]
+        counts[r] += 1
+    return total
+
+
+assert num_pairs_divisible_by_60([30, 20, 150, 100, 40]) == 3
+assert num_pairs_divisible_by_60([60, 60, 60]) == 3
+assert num_pairs_divisible_by_60([]) == 0
+```
+
+Complexity: O(n) time, O(60) space.
+
+The `% 60` on the complement handles remainder 0, which pairs with itself.
+F:
+- Generalise to divisibility by k.
+- Count triples instead.
+
+@@ K-diff Pairs in an Array | Medium | Hash map
+Q: Count unique pairs `(a, b)` with `|a - b| == k`.
+
+Example: `[3,1,4,1,5], k = 2` → `2` ((1,3) and (3,5))
+A:
+Approach: count values. For `k > 0`, count the distinct x with `x + k` present. For `k == 0`, count the values that occur more than once.
+
+```python
+from collections import Counter
+
+
+def find_pairs(nums: list[int], k: int) -> int:
+    if k < 0:
+        return 0
+    c = Counter(nums)
+    if k == 0:
+        return sum(v > 1 for v in c.values())
+    return sum(x + k in c for x in c)
+
+
+assert find_pairs([3, 1, 4, 1, 5], 2) == 2
+assert find_pairs([1, 2, 3, 4, 5], 1) == 4
+assert find_pairs([1, 3, 1, 5, 4], 0) == 1
+```
+
+Complexity: O(n).
+F:
+- Return the pairs themselves.
+- Sorted array with O(1) extra space (two pointers).
+
+@@ 4Sum II | Medium | Meet in the middle
+Q: Given four equal-length arrays, count the tuples `(i, j, k, l)` with `A[i] + B[j] + C[k] + D[l] == 0`.
+
+Example: `A=[1,2], B=[-2,-1], C=[-1,2], D=[0,2]` → `2`
+A:
+Approach: meet in the middle. Count all sums of `A + B` (n² of them), then for each `C + D` sum, look up its negation.
+
+```python
+from collections import Counter
+
+
+def four_sum_count(a: list[int], b: list[int], c: list[int], d: list[int]) -> int:
+    ab = Counter(x + y for x in a for y in b)
+    return sum(ab[-(x + y)] for x in c for y in d)
+
+
+assert four_sum_count([1, 2], [-2, -1], [-1, 2], [0, 2]) == 2
+assert four_sum_count([0], [0], [0], [0]) == 1
+```
+
+Complexity: O(n²) time and space versus O(n⁴) brute force.
+F:
+- Generalise to k arrays (split into two halves).
+- 4Sum on a single array with unique quadruplets (sort + two pointers).
+
+@@ Array of Doubled Pairs | Medium | Greedy counting
+Q: Can an even-length array be reordered so that `arr[2i+1] == 2 * arr[2i]` for every i?
+
+Example: `[4,-2,2,-4]` → `True`, `[3,1,3,6]` → `False`
+A:
+Approach: process values in order of absolute value. The smallest remaining `x` must pair with `2x`. Zeros pair with each other, so their count must be even.
+
+```python
+from collections import Counter
+
+
+def can_reorder_doubled(arr: list[int]) -> bool:
+    c = Counter(arr)
+    if c[0] % 2:
+        return False
+    for x in sorted(c, key=abs):
+        if x == 0 or c[x] == 0:
+            continue
+        if c[2 * x] < c[x]:
+            return False
+        c[2 * x] -= c[x]
+    return True
+
+
+assert can_reorder_doubled([4, -2, 2, -4])
+assert not can_reorder_doubled([3, 1, 3, 6])
+assert not can_reorder_doubled([2, 1, 2, 6])
+assert not can_reorder_doubled([0, 0, 0, 0, 1, 2, 3])
+assert can_reorder_doubled([0, 0])
+```
+
+Complexity: O(n log n) for sorting the distinct values.
+F:
+- Find the original array from a doubled array.
+- Why sort by absolute value instead of by value?
+
+@@ Hand of Straights | Medium | Greedy counting
+Q: Can the cards be split into groups of `group_size` consecutive values?
+
+Example: `[1,2,3,6,2,3,4,7,8], 3` → `True`
+A:
+Approach: the smallest remaining card must start a group. Take its count `n` and remove `n` copies of each of the next `group_size` values.
+
+```python
+from collections import Counter
+
+
+def is_n_straight_hand(hand: list[int], group_size: int) -> bool:
+    if len(hand) % group_size:
+        return False
+    c = Counter(hand)
+    for x in sorted(c):
+        n = c[x]
+        if n:
+            for y in range(x, x + group_size):
+                if c[y] < n:
+                    return False
+                c[y] -= n
+    return True
+
+
+assert is_n_straight_hand([1, 2, 3, 6, 2, 3, 4, 7, 8], 3)
+assert not is_n_straight_hand([1, 2, 3, 4, 5], 4)
+assert is_n_straight_hand([], 1)
+```
+
+Complexity: O(n log n + distinct × group_size).
+F:
+- Divide an array into sets of k consecutive numbers (the same problem).
+- Streaming version with a queue of open groups.
+
+@@ Insert Delete GetRandom O(1) | Medium | Hash map with array
+Q: Design a set supporting `insert`, `remove` and `get_random` (uniform), all in average O(1).
+A:
+Approach: an array of values plus a dict from value to index. To remove, move the last element into the removed slot, update its index, and pop the end.
+
+```python
+import random
+
+
+class RandomizedSet:
+    def __init__(self, rng: random.Random | None = None) -> None:
+        self._values: list[int] = []
+        self._index: dict[int, int] = {}
+        self._rng = rng or random.Random()
+
+    def insert(self, val: int) -> bool:
+        if val in self._index:
+            return False
+        self._index[val] = len(self._values)
+        self._values.append(val)
+        return True
+
+    def remove(self, val: int) -> bool:
+        i = self._index.pop(val, None)
+        if i is None:
+            return False
+        last = self._values.pop()
+        if i < len(self._values):
+            self._values[i] = last
+            self._index[last] = i
+        return True
+
+    def get_random(self) -> int:
+        return self._rng.choice(self._values)
+
+
+rs = RandomizedSet(random.Random(1))
+assert rs.insert(1) and not rs.remove(2) and rs.insert(2)
+assert rs.get_random() in (1, 2)
+assert rs.remove(1) and not rs.insert(2)
+assert rs.get_random() == 2
+assert rs.remove(2) and rs._values == [] and rs._index == {}
+```
+
+Complexity: O(1) average for every operation.
+
+Edge case: removing the last element itself (the `i < len` guard).
+F:
+- Allow duplicates (dict of value to set of indices).
+- Weighted random selection (prefix sums + binary search).
+
+@@ Design HashMap | Easy | Hashing internals
+Q: Implement a hash map with `put`, `get` and `remove` without using built-in hash tables.
+A:
+Approach: separate chaining. Keep an array of buckets, each a list of `[key, value]` pairs, and double the capacity when the load factor exceeds 0.75. Interviewers use this to probe how dicts work: hashing, collisions and resizing.
+
+```python
+class MyHashMap:
+    def __init__(self, capacity: int = 8) -> None:
+        self._buckets: list[list[list[int]]] = [[] for _ in range(capacity)]
+        self._size = 0
+
+    def _bucket(self, key: int) -> list[list[int]]:
+        return self._buckets[hash(key) % len(self._buckets)]
+
+    def put(self, key: int, value: int) -> None:
+        bucket = self._bucket(key)
+        for pair in bucket:
+            if pair[0] == key:
+                pair[1] = value
+                return
+        bucket.append([key, value])
+        self._size += 1
+        if self._size > 0.75 * len(self._buckets):
+            self._resize()
+
+    def get(self, key: int) -> int:
+        for k, v in self._bucket(key):
+            if k == key:
+                return v
+        return -1
+
+    def remove(self, key: int) -> None:
+        bucket = self._bucket(key)
+        for i, (k, _) in enumerate(bucket):
+            if k == key:
+                bucket.pop(i)
+                self._size -= 1
+                return
+
+    def _resize(self) -> None:
+        old = self._buckets
+        self._buckets = [[] for _ in range(2 * len(old))]
+        for bucket in old:
+            for k, v in bucket:
+                self._bucket(k).append([k, v])
+
+
+m = MyHashMap()
+for i in range(100):
+    m.put(i, i * i)
+m.put(5, -1)
+m.remove(7)
+assert m.get(5) == -1 and m.get(7) == -1 and m.get(99) == 9801 and m.get(1000) == -1
+assert len(m._buckets) >= 128
+```
+
+Complexity: O(1) average and O(n) worst case per operation. Resizing is O(n), but amortised it is O(1).
+F:
+- CPython uses open addressing, not chaining. What are the trade-offs?
+- Hash flooding attacks and why Python randomises string hashing.
+
+@@ Text Justification | Hard | Greedy string formatting
+Q: Given words and `max_width`, fully justify the text: pack as many words per line as fit, distribute the spaces evenly (with extra spaces going to the left gaps), and left-justify the last line and any single-word line.
+A:
+Approach: greedily pick words for each line. Then either left-justify (last line or a single word) or distribute `spaces = max_width - letters` across `gaps` using `divmod`.
+
+```python
+def full_justify(words: list[str], max_width: int) -> list[str]:
+    lines, i = [], 0
+    while i < len(words):
+        j, letters = i, 0
+        while j < len(words) and letters + len(words[j]) + (j - i) <= max_width:
+            letters += len(words[j])
+            j += 1
+        line_words, gaps = words[i:j], j - i - 1
+        if j == len(words) or gaps == 0:
+            line = " ".join(line_words).ljust(max_width)
+        else:
+            q, r = divmod(max_width - letters, gaps)
+            line = ""
+            for k, w in enumerate(line_words[:-1]):
+                line += w + " " * (q + (1 if k < r else 0))
+            line += line_words[-1]
+        lines.append(line)
+        i = j
+    return lines
+
+
+assert full_justify(["This", "is", "an", "example", "of", "text", "justification."], 16) == [
+    "This    is    an", "example  of text", "justification.  "]
+assert full_justify(["What", "must", "be", "acknowledgment", "shall", "be"], 16) == [
+    "What   must   be", "acknowledgment  ", "shall be        "]
+```
+
+Complexity: O(total characters).
+
+Interview value: the algorithm is simple, and the score comes from handling the edge cases cleanly (last line, single word, remainder distribution).
+F:
+- Minimise raggedness instead (the Knuth-Plass DP).
+- Unicode width issues (East Asian wide characters, emoji).
+
+@@ Invalid Transactions | Medium | Hash map with sorting
+Q: Each transaction is `"name,time,amount,city"`. A transaction is possibly invalid if the amount exceeds 1000, or if it occurs within 60 minutes (inclusive) of another transaction with the same name in a different city. Return all possibly invalid transactions.
+
+Example: `["alice,20,800,mtv","alice,50,100,beijing"]` → both
+A:
+Why it matters here: a simplified fraud or compliance rule, the kind of logic Corporate Technology teams build for Risk and Compliance.
+
+Approach: group by name and sort by time. For each transaction, scan forward only while the time difference is at most 60. Flag both sides when the cities differ, and flag large amounts directly.
+
+```python
+from collections import defaultdict
+
+
+def invalid_transactions(transactions: list[str]) -> list[str]:
+    by_name: dict[str, list[tuple[int, int, str, int]]] = defaultdict(list)
+    for idx, t in enumerate(transactions):
+        name, time, amount, city = t.split(",")
+        by_name[name].append((int(time), int(amount), city, idx))
+    invalid: set[int] = set()
+    for items in by_name.values():
+        items.sort()
+        for a, (t1, amt, c1, i1) in enumerate(items):
+            if amt > 1000:
+                invalid.add(i1)
+            for t2, _, c2, i2 in items[a + 1:]:
+                if t2 - t1 > 60:
+                    break
+                if c2 != c1:
+                    invalid.update((i1, i2))
+    return [transactions[i] for i in sorted(invalid)]
+
+
+assert invalid_transactions(["alice,20,800,mtv", "alice,50,100,beijing"]) == [
+    "alice,20,800,mtv", "alice,50,100,beijing"]
+assert invalid_transactions(["alice,20,800,mtv", "alice,50,1200,mtv"]) == ["alice,50,1200,mtv"]
+assert invalid_transactions(["alice,20,800,mtv", "bob,50,1200,mtv"]) == ["bob,50,1200,mtv"]
+```
+
+Complexity: O(n log n + n·w), where w is the number of transactions within a 60-minute window.
+F:
+- Run this on a real-time stream (keyed windows in Kafka Streams or Flink, per-user state in Redis).
+- Make the rules configurable and auditable (a rules engine with versioned rule sets).
+- How do you avoid flagging the same pair twice, and how do you explain each flag to an analyst?

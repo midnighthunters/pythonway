@@ -1,0 +1,3226 @@
+@@ Two Sum II - Input Array Is Sorted | Medium | Two pointers
+Q: `numbers` is sorted in non-decreasing order. Return the 1-based indices of the two numbers that add up to `target`, using O(1) extra space.
+
+Example: `[2,7,11,15], 9` → `[1,2]`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: start one pointer at each end. If the sum is too small, move the left pointer right; if too large, move the right pointer left. Each step discards one element that can't be part of any answer.
+
+```python
+def two_sum_sorted(numbers: list[int], target: int) -> list[int]:
+    i, j = 0, len(numbers) - 1
+    while i < j:
+        s = numbers[i] + numbers[j]
+        if s == target:
+            return [i + 1, j + 1]
+        if s < target:
+            i += 1
+        else:
+            j -= 1
+    return []
+
+
+assert two_sum_sorted([2, 7, 11, 15], 9) == [1, 2]
+assert two_sum_sorted([2, 3, 4], 6) == [1, 3]
+assert two_sum_sorted([-1, 0], -1) == [1, 2]
+assert two_sum_sorted([1, 2], 10) == []
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Prove the pointer moves never skip the answer.
+- Count all pairs with sum ≤ target.
+
+@@ 3Sum | Medium | Two pointers
+Q: Return all unique triplets `[a, b, c]` from `nums` with `a + b + c == 0`.
+
+Example: `[-1,0,1,2,-1,-4]` → `[[-1,-1,2],[-1,0,1]]`
+A:
+Approach: sort. Fix `nums[i]` and run two pointers on the rest. Skip duplicate values for `i`, and skip duplicate values for `lo` after a match.
+
+```python
+def three_sum(nums: list[int]) -> list[list[int]]:
+    a = sorted(nums)
+    out: list[list[int]] = []
+    for i in range(len(a) - 2):
+        if a[i] > 0:
+            break
+        if i > 0 and a[i] == a[i - 1]:
+            continue
+        lo, hi = i + 1, len(a) - 1
+        while lo < hi:
+            s = a[i] + a[lo] + a[hi]
+            if s < 0:
+                lo += 1
+            elif s > 0:
+                hi -= 1
+            else:
+                out.append([a[i], a[lo], a[hi]])
+                lo, hi = lo + 1, hi - 1
+                while lo < hi and a[lo] == a[lo - 1]:
+                    lo += 1
+    return out
+
+
+assert three_sum([-1, 0, 1, 2, -1, -4]) == [[-1, -1, 2], [-1, 0, 1]]
+assert three_sum([0, 1, 1]) == []
+assert three_sum([0, 0, 0, 0]) == [[0, 0, 0]]
+```
+
+Complexity: O(n²) time, and O(1) extra space besides the sort and the output.
+F:
+- Why is sorting needed for deduplication?
+- 3Sum Smaller: count the triplets with sum < target.
+
+@@ 3Sum Closest | Medium | Two pointers
+Q: Return the sum of the three integers in `nums` whose sum is closest to `target`.
+
+Example: `[-1,2,1,-4], 1` → `2`
+A:
+Approach: the same sort-and-squeeze pattern as 3Sum, tracking the best sum seen. Return early on an exact match.
+
+```python
+def three_sum_closest(nums: list[int], target: int) -> int:
+    a = sorted(nums)
+    best = a[0] + a[1] + a[2]
+    for i in range(len(a) - 2):
+        lo, hi = i + 1, len(a) - 1
+        while lo < hi:
+            s = a[i] + a[lo] + a[hi]
+            if abs(s - target) < abs(best - target):
+                best = s
+            if s < target:
+                lo += 1
+            elif s > target:
+                hi -= 1
+            else:
+                return s
+    return best
+
+
+assert three_sum_closest([-1, 2, 1, -4], 1) == 2
+assert three_sum_closest([0, 0, 0], 1) == 0
+assert three_sum_closest([1, 1, 1, 0], 100) == 3
+```
+
+Complexity: O(n²).
+F:
+- What if ties must return the smaller sum?
+
+@@ 4Sum | Medium | k-Sum recursion
+Q: Return all unique quadruplets that sum to `target`.
+
+Example: `[1,0,-1,0,-2,2], 0` → `[[-2,-1,1,2],[-2,0,0,2],[-1,0,0,1]]`
+A:
+Approach: a generic k-sum. Recurse down to 2-sum, which uses two pointers, and deduplicate at every level. It is worth showing because it generalises cleanly.
+
+```python
+def four_sum(nums: list[int], target: int) -> list[list[int]]:
+    a = sorted(nums)
+
+    def k_sum(start: int, k: int, t: int) -> list[list[int]]:
+        res: list[list[int]] = []
+        if k == 2:
+            lo, hi = start, len(a) - 1
+            while lo < hi:
+                s = a[lo] + a[hi]
+                if s < t:
+                    lo += 1
+                elif s > t:
+                    hi -= 1
+                else:
+                    res.append([a[lo], a[hi]])
+                    lo, hi = lo + 1, hi - 1
+                    while lo < hi and a[lo] == a[lo - 1]:
+                        lo += 1
+            return res
+        for i in range(start, len(a) - k + 1):
+            if i > start and a[i] == a[i - 1]:
+                continue
+            for sub in k_sum(i + 1, k - 1, t - a[i]):
+                res.append([a[i], *sub])
+        return res
+
+    return k_sum(0, 4, target)
+
+
+assert four_sum([1, 0, -1, 0, -2, 2], 0) == [[-2, -1, 1, 2], [-2, 0, 0, 2], [-1, 0, 0, 1]]
+assert four_sum([2, 2, 2, 2, 2], 8) == [[2, 2, 2, 2]]
+```
+
+Complexity: O(n^(k-1)), which is O(n³) for 4Sum.
+F:
+- Add pruning with min/max bounds at each level.
+- Count quadruplets across four arrays (4Sum II, a hash map in O(n²)).
+
+@@ Container With Most Water | Medium | Two pointers
+Q: Choose two lines from `height` that, together with the x-axis, hold the most water. Return that area.
+
+Example: `[1,8,6,2,5,4,8,3,7]` → `49`
+A:
+Approach: start with the widest pair. The area is capped by the shorter line, so move the shorter side inwards. Moving the taller one can only shrink the width without raising the cap.
+
+```python
+def max_area(height: list[int]) -> int:
+    i, j, best = 0, len(height) - 1, 0
+    while i < j:
+        best = max(best, (j - i) * min(height[i], height[j]))
+        if height[i] < height[j]:
+            i += 1
+        else:
+            j -= 1
+    return best
+
+
+assert max_area([1, 8, 6, 2, 5, 4, 8, 3, 7]) == 49
+assert max_area([1, 1]) == 1
+assert max_area([4, 3, 2, 1, 4]) == 16
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Give a rigorous argument for why moving the taller line is never better.
+- How is this different from Trapping Rain Water?
+
+@@ Trapping Rain Water | Hard | Two pointers
+Q: Given an elevation map, compute how much rain water it traps.
+
+Example: `[0,1,0,2,1,0,1,3,2,1,2,1]` → `6`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: the water over bar i is `min(max_left, max_right) - h[i]`. Use two pointers and always process the side with the smaller bar, because that side's max is the binding constraint.
+
+```python
+def trap(height: list[int]) -> int:
+    i, j = 0, len(height) - 1
+    left_max = right_max = water = 0
+    while i < j:
+        if height[i] < height[j]:
+            left_max = max(left_max, height[i])
+            water += left_max - height[i]
+            i += 1
+        else:
+            right_max = max(right_max, height[j])
+            water += right_max - height[j]
+            j -= 1
+    return water
+
+
+assert trap([0, 1, 0, 2, 1, 0, 1, 3, 2, 1, 2, 1]) == 6
+assert trap([4, 2, 0, 3, 2, 5]) == 9
+assert trap([]) == 0
+assert trap([3]) == 0
+```
+
+Complexity: O(n) time, O(1) space. Alternatives: prefix/suffix max arrays in O(n) space, or a monotonic stack.
+F:
+- Explain the monotonic-stack version (it computes the water in horizontal layers).
+- Trapping Rain Water II on a 2-D grid (a min-heap from the border).
+
+@@ Sort Colors | Medium | Dutch national flag
+Q: Sort an array of 0s, 1s and 2s in place in one pass.
+
+Example: `[2,0,2,1,1,0]` → `[0,0,1,1,2,2]`
+A:
+Approach: three regions: `[0, lo)` holds 0s, `[lo, mid)` holds 1s, and `(hi, end]` holds 2s. Do not advance `mid` after swapping with `hi`, because the swapped-in value hasn't been examined yet.
+
+```python
+def sort_colors(nums: list[int]) -> None:
+    lo = mid = 0
+    hi = len(nums) - 1
+    while mid <= hi:
+        if nums[mid] == 0:
+            nums[lo], nums[mid] = nums[mid], nums[lo]
+            lo += 1
+            mid += 1
+        elif nums[mid] == 1:
+            mid += 1
+        else:
+            nums[mid], nums[hi] = nums[hi], nums[mid]
+            hi -= 1
+
+
+for case in ([2, 0, 2, 1, 1, 0], [2, 0, 1], [0], [1, 1], [2, 2, 0, 0, 1]):
+    expected = sorted(case)
+    sort_colors(case)
+    assert case == expected
+```
+
+Complexity: O(n) time, O(1) space, one pass.
+F:
+- The same partitioning drives 3-way quicksort. Why does it help with many duplicates?
+- Sort with k colours (counting sort, or repeated partitioning).
+
+@@ Squares of a Sorted Array | Easy | Two pointers
+Q: Given a sorted array (which may contain negatives), return the squares in sorted order in O(n).
+
+Example: `[-4,-1,0,3,10]` → `[0,1,9,16,100]`
+A:
+Approach: the largest square is at one of the two ends. Fill the output from the back.
+
+```python
+def sorted_squares(nums: list[int]) -> list[int]:
+    n = len(nums)
+    out = [0] * n
+    i, j = 0, n - 1
+    for w in range(n - 1, -1, -1):
+        if abs(nums[i]) > abs(nums[j]):
+            out[w] = nums[i] * nums[i]
+            i += 1
+        else:
+            out[w] = nums[j] * nums[j]
+            j -= 1
+    return out
+
+
+assert sorted_squares([-4, -1, 0, 3, 10]) == [0, 1, 9, 16, 100]
+assert sorted_squares([-7, -3, 2, 3, 11]) == [4, 9, 9, 49, 121]
+assert sorted_squares([]) == []
+```
+
+Complexity: O(n) time, O(n) output space.
+F:
+- Apply any monotonic-then-reversed function (`ax² + bx + c`): Sort Transformed Array.
+
+@@ Remove Element | Easy | Two pointers
+Q: Remove all occurrences of `val` in place and return the count `k` of remaining elements. The first `k` slots must hold them, in any order.
+
+Example: `[3,2,2,3], 3` → `2`
+A:
+Approach: a write pointer copies forward every value that isn't `val`. If removals are rare and order doesn't matter, swapping with the end reduces the number of writes.
+
+```python
+def remove_element(nums: list[int], val: int) -> int:
+    k = 0
+    for x in nums:
+        if x != val:
+            nums[k] = x
+            k += 1
+    return k
+
+
+a = [3, 2, 2, 3]
+assert remove_element(a, 3) == 2 and a[:2] == [2, 2]
+b = [0, 1, 2, 2, 3, 0, 4, 2]
+k = remove_element(b, 2)
+assert k == 5 and sorted(b[:k]) == [0, 0, 1, 3, 4]
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Minimise writes when `val` is rare.
+
+@@ Reverse Vowels of a String | Easy | Two pointers
+Q: Reverse only the vowels (upper or lower case) in a string.
+
+Example: `"IceCreAm"` → `"AceCreIm"`
+A:
+```python
+VOWELS = set("aeiouAEIOU")
+
+
+def reverse_vowels(s: str) -> str:
+    chars = list(s)
+    i, j = 0, len(chars) - 1
+    while i < j:
+        if chars[i] not in VOWELS:
+            i += 1
+        elif chars[j] not in VOWELS:
+            j -= 1
+        else:
+            chars[i], chars[j] = chars[j], chars[i]
+            i, j = i + 1, j - 1
+    return "".join(chars)
+
+
+assert reverse_vowels("IceCreAm") == "AceCreIm"
+assert reverse_vowels("leetcode") == "leotcede"
+assert reverse_vowels("xyz") == "xyz"
+```
+
+Complexity: O(n) time. Python strings are immutable, so the list costs O(n) space.
+F:
+- Why convert to a list instead of concatenating strings?
+
+@@ Is Subsequence | Easy | Two pointers
+Q: Return whether `s` is a subsequence of `t` (the characters of `s` appear in `t` in order, not necessarily contiguously).
+
+Example: `"abc", "ahbgdc"` → `True`
+A:
+Approach: greedily match each character of `s` at its earliest possible position in `t`. The Pythonic version uses a shared iterator, since `in` consumes it.
+
+```python
+def is_subsequence(s: str, t: str) -> bool:
+    it = iter(t)
+    return all(ch in it for ch in s)
+
+
+def is_subsequence_explicit(s: str, t: str) -> bool:
+    i = 0
+    for ch in t:
+        if i < len(s) and s[i] == ch:
+            i += 1
+    return i == len(s)
+
+
+for f in (is_subsequence, is_subsequence_explicit):
+    assert f("abc", "ahbgdc")
+    assert not f("axc", "ahbgdc")
+    assert f("", "anything")
+```
+
+Complexity: O(|t|).
+F:
+- Many `s` queries against one huge `t` (index the positions per character, then binary search).
+- Explain why `ch in it` works.
+
+@@ Backspace String Compare | Easy | Two pointers
+Q: `#` means backspace. Return whether `s` and `t` are equal after typing both. Aim for O(1) space.
+
+Example: `"ab#c", "ad#c"` → `True`
+A:
+Approach: walk backwards and skip the characters erased by `#`. Generators keep it readable, and `zip_longest` detects a length mismatch.
+
+```python
+from itertools import zip_longest
+
+
+def backspace_compare(s: str, t: str) -> bool:
+    def typed(x: str):
+        skip = 0
+        for ch in reversed(x):
+            if ch == "#":
+                skip += 1
+            elif skip:
+                skip -= 1
+            else:
+                yield ch
+
+    return all(a == b for a, b in zip_longest(typed(s), typed(t)))
+
+
+assert backspace_compare("ab#c", "ad#c")
+assert backspace_compare("ab##", "c#d#")
+assert not backspace_compare("a#c", "b")
+assert backspace_compare("a##c", "#a#c")
+```
+
+Complexity: O(n + m) time, O(1) space.
+F:
+- The simpler stack version, and when you'd prefer it.
+
+@@ Boats to Save People | Medium | Greedy two pointers
+Q: Each boat carries at most two people and at most `limit` weight. Return the minimum number of boats.
+
+Example: `[3,2,2,1], limit 3` → `3`
+A:
+Approach: sort. The heaviest person always takes a boat, and pairs with the lightest person if they fit.
+
+```python
+def num_rescue_boats(people: list[int], limit: int) -> int:
+    p = sorted(people)
+    i, j, boats = 0, len(p) - 1, 0
+    while i <= j:
+        if p[i] + p[j] <= limit:
+            i += 1
+        j -= 1
+        boats += 1
+    return boats
+
+
+assert num_rescue_boats([1, 2], 3) == 1
+assert num_rescue_boats([3, 2, 2, 1], 3) == 3
+assert num_rescue_boats([3, 5, 3, 4], 5) == 4
+```
+
+Complexity: O(n log n).
+
+Why greedy works: if the heaviest person can't pair with the lightest, they can't pair with anyone.
+F:
+- Boats carry up to k people (much harder, related to bin packing).
+
+@@ Partition Labels | Medium | Greedy
+Q: Split `s` into as many parts as possible so each letter appears in at most one part. Return the part sizes.
+
+Example: `"ababcbacadefegdehijhklij"` → `[9,7,8]`
+A:
+Approach: record the last index of each letter. Extend the current part to the furthest last index seen, and cut when `i` reaches it.
+
+```python
+def partition_labels(s: str) -> list[int]:
+    last = {ch: i for i, ch in enumerate(s)}
+    sizes, start, end = [], 0, 0
+    for i, ch in enumerate(s):
+        end = max(end, last[ch])
+        if i == end:
+            sizes.append(end - start + 1)
+            start = i + 1
+    return sizes
+
+
+assert partition_labels("ababcbacadefegdehijhklij") == [9, 7, 8]
+assert partition_labels("eccbbbbdec") == [10]
+assert partition_labels("abc") == [1, 1, 1]
+```
+
+Complexity: O(n) time, O(1) space for a fixed alphabet.
+F:
+- It is equivalent to merging intervals `[first, last]` per letter. Show that.
+
+@@ Remove Duplicates from Sorted Array II | Medium | Two pointers
+Q: In a sorted array, keep each value at most twice, in place. Return the new length.
+
+Example: `[1,1,1,2,2,3]` → `5` (`[1,1,2,2,3]`)
+A:
+Approach: write `x` if fewer than two elements have been kept, or if `x` differs from the element two positions back. This generalises to at most k copies.
+
+```python
+def remove_duplicates_at_most_twice(nums: list[int], k: int = 2) -> int:
+    w = 0
+    for x in nums:
+        if w < k or x != nums[w - k]:
+            nums[w] = x
+            w += 1
+    return w
+
+
+a = [1, 1, 1, 2, 2, 3]
+n = remove_duplicates_at_most_twice(a)
+assert n == 5 and a[:n] == [1, 1, 2, 2, 3]
+b = [0, 0, 1, 1, 1, 1, 2, 3, 3]
+n = remove_duplicates_at_most_twice(b)
+assert n == 7 and b[:n] == [0, 0, 1, 1, 2, 3, 3]
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Why compare with `nums[w-k]` rather than `nums[i-k]`?
+
+@@ Valid Triangle Number | Medium | Two pointers
+Q: Count the triplets in `nums` that can form a triangle (the sum of any two sides is greater than the third).
+
+Example: `[2,2,3,4]` → `3`
+A:
+Approach: sort, then fix the largest side `a[k]`. Squeeze `i` and `j` below it. If `a[i] + a[j] > a[k]`, every index from `i` to `j-1` also works with `j`, so add `j - i` at once.
+
+```python
+def triangle_number(nums: list[int]) -> int:
+    a = sorted(nums)
+    count = 0
+    for k in range(len(a) - 1, 1, -1):
+        i, j = 0, k - 1
+        while i < j:
+            if a[i] + a[j] > a[k]:
+                count += j - i
+                j -= 1
+            else:
+                i += 1
+    return count
+
+
+assert triangle_number([2, 2, 3, 4]) == 3
+assert triangle_number([4, 2, 3, 4]) == 4
+assert triangle_number([0, 0, 0]) == 0
+```
+
+Complexity: O(n²).
+F:
+- Why is fixing the largest side the key insight?
+
+@@ Two Sum Less Than K | Easy | Two pointers
+Q: Return the maximum `nums[i] + nums[j]` (with i ≠ j) that is strictly less than `k`, or `-1`.
+
+Example: `[34,23,1,24,75,33,54,8], 60` → `58`
+A:
+```python
+def two_sum_less_than_k(nums: list[int], k: int) -> int:
+    a = sorted(nums)
+    i, j, best = 0, len(a) - 1, -1
+    while i < j:
+        s = a[i] + a[j]
+        if s < k:
+            best = max(best, s)
+            i += 1
+        else:
+            j -= 1
+    return best
+
+
+assert two_sum_less_than_k([34, 23, 1, 24, 75, 33, 54, 8], 60) == 58
+assert two_sum_less_than_k([10, 20, 30], 15) == -1
+```
+
+Complexity: O(n log n). With small value bounds, counting sort brings it to O(n + range).
+F:
+- Budget framing: the two items that best use up a gift card without going over.
+
+@@ Minimum Difference Between Highest and Lowest of K Scores | Easy | Sorting and window
+Q: Pick `k` scores to minimise the difference between the highest and the lowest. Return that minimum.
+
+Example: `[9,4,1,7], k = 2` → `2`
+A:
+Approach: after sorting, the best k are contiguous. Slide a window of size k.
+
+```python
+def minimum_difference(nums: list[int], k: int) -> int:
+    a = sorted(nums)
+    return min(a[i + k - 1] - a[i] for i in range(len(a) - k + 1))
+
+
+assert minimum_difference([90], 1) == 0
+assert minimum_difference([9, 4, 1, 7], 2) == 2
+assert minimum_difference([1, 5, 9, 13], 3) == 8
+```
+
+Complexity: O(n log n).
+F:
+- Why must the optimal k be contiguous after sorting?
+
+@@ Bag of Tokens | Medium | Greedy two pointers
+Q: Playing token i face up costs `tokens[i]` power and gains 1 score. Playing it face down costs 1 score and gains `tokens[i]` power. Each token is used at most once. Return the maximum score.
+
+Example: `[100,200,300,400], power 200` → `2`
+A:
+Approach: sort. Buy score with the cheapest token. When you can't, sell 1 score for the most expensive token. Track the best score seen, because the final score might be lower.
+
+```python
+def bag_of_tokens_score(tokens: list[int], power: int) -> int:
+    t = sorted(tokens)
+    i, j, score, best = 0, len(t) - 1, 0, 0
+    while i <= j:
+        if power >= t[i]:
+            power -= t[i]
+            i += 1
+            score += 1
+            best = max(best, score)
+        elif score > 0:
+            power += t[j]
+            j -= 1
+            score -= 1
+        else:
+            break
+    return best
+
+
+assert bag_of_tokens_score([100], 50) == 0
+assert bag_of_tokens_score([200, 100], 150) == 1
+assert bag_of_tokens_score([100, 200, 300, 400], 200) == 2
+```
+
+Complexity: O(n log n).
+F:
+- Why track `best` rather than returning the final `score`?
+
+@@ Longest Mountain in Array | Medium | Two pointers
+Q: A mountain strictly increases and then strictly decreases, and has length at least 3. Return the length of the longest mountain subarray.
+
+Example: `[2,1,4,7,3,2,5]` → `5` (`[1,4,7,3,2]`)
+A:
+Approach: one scan. From each potential base, climb while the values increase. If a strict descent follows, walk down it and record the length.
+
+```python
+def longest_mountain(arr: list[int]) -> int:
+    n, best, i = len(arr), 0, 1
+    while i < n:
+        if arr[i] <= arr[i - 1]:
+            i += 1
+            continue
+        start = i - 1
+        while i < n and arr[i] > arr[i - 1]:
+            i += 1
+        if i < n and arr[i] < arr[i - 1]:
+            while i < n and arr[i] < arr[i - 1]:
+                i += 1
+            best = max(best, i - start)
+    return best
+
+
+assert longest_mountain([2, 1, 4, 7, 3, 2, 5]) == 5
+assert longest_mountain([2, 2, 2]) == 0
+assert longest_mountain([0, 1, 2, 3, 4, 5, 4, 3, 2, 1, 0]) == 11
+assert longest_mountain([1, 2, 2, 1]) == 0
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Minimum removals to make a mountain array (LIS from both sides).
+
+@@ Longest Substring Without Repeating Characters | Medium | Sliding window
+Q: Return the length of the longest substring without repeating characters.
+
+Example: `"abcabcbb"` → `3`, `"pwwkew"` → `3`
+A:
+Seen in: JPMorgan-tagged list (very frequent).
+
+Approach: a variable window with a last-seen index map. When a character repeats inside the window, jump `left` past its previous position. The `>= left` check handles stale indices, as in `"abba"`.
+
+```python
+def length_of_longest_substring(s: str) -> int:
+    last: dict[str, int] = {}
+    left = best = 0
+    for i, ch in enumerate(s):
+        if last.get(ch, -1) >= left:
+            left = last[ch] + 1
+        last[ch] = i
+        best = max(best, i - left + 1)
+    return best
+
+
+assert length_of_longest_substring("abcabcbb") == 3
+assert length_of_longest_substring("bbbbb") == 1
+assert length_of_longest_substring("pwwkew") == 3
+assert length_of_longest_substring("") == 0
+assert length_of_longest_substring("abba") == 2
+```
+
+Complexity: O(n) time, O(min(n, alphabet)) space.
+F:
+- Return the substring itself.
+- At most k repeats per character.
+- What does the `abba` case show about stale indices?
+
+@@ Maximum Average Subarray I | Easy | Fixed window
+Q: Return the maximum average of any contiguous subarray of length `k`.
+
+Example: `[1,12,-5,-6,50,3], k = 4` → `12.75`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: a fixed window with a running sum. Add the new element and subtract the one leaving.
+
+```python
+def find_max_average(nums: list[int], k: int) -> float:
+    window = best = sum(nums[:k])
+    for i in range(k, len(nums)):
+        window += nums[i] - nums[i - k]
+        best = max(best, window)
+    return best / k
+
+
+assert find_max_average([1, 12, -5, -6, 50, 3], 4) == 12.75
+assert find_max_average([5], 1) == 5.0
+assert find_max_average([-1, -2, -3], 2) == -1.5
+```
+
+Complexity: O(n) time, O(1) space.
+
+Tip: compare sums, and divide only once at the end. This avoids floating-point drift.
+F:
+- Maximum average of length at least k (binary search on the answer plus prefix sums).
+- Rolling 7-day average transaction value per customer.
+
+@@ Minimum Size Subarray Sum | Medium | Variable window
+Q: Given positive integers, return the minimal length of a contiguous subarray with sum ≥ `target`, or 0.
+
+Example: `target = 7, [2,3,1,2,4,3]` → `2`
+A:
+Approach: grow the window on the right, then shrink it from the left while the sum still meets the target. This works because all values are positive, so the window sum is monotonic.
+
+```python
+def min_subarray_len(target: int, nums: list[int]) -> int:
+    left = total = 0
+    best = float("inf")
+    for right, x in enumerate(nums):
+        total += x
+        while total >= target:
+            best = min(best, right - left + 1)
+            total -= nums[left]
+            left += 1
+    return 0 if best == float("inf") else int(best)
+
+
+assert min_subarray_len(7, [2, 3, 1, 2, 4, 3]) == 2
+assert min_subarray_len(4, [1, 4, 4]) == 1
+assert min_subarray_len(11, [1, 1, 1, 1, 1, 1, 1, 1]) == 0
+```
+
+Complexity: O(n). Each index enters and leaves the window once.
+F:
+- What breaks if negatives are allowed? (Use a prefix sum with a monotonic deque: Shortest Subarray with Sum at Least K.)
+- O(n log n) version with prefix sums and binary search.
+
+@@ Longest Repeating Character Replacement | Medium | Variable window
+Q: You may replace at most `k` characters. Return the length of the longest substring of one repeated letter you can get.
+
+Example: `"AABABBA", k = 1` → `4`
+A:
+Approach: a window is valid if `length - max_freq ≤ k`. `max_freq` never needs to decrease, because a smaller value can't produce a longer answer. When the window is invalid, slide it by one instead of shrinking it.
+
+```python
+from collections import Counter
+
+
+def character_replacement(s: str, k: int) -> int:
+    counts: Counter[str] = Counter()
+    left = max_freq = best = 0
+    for right, ch in enumerate(s):
+        counts[ch] += 1
+        max_freq = max(max_freq, counts[ch])
+        if right - left + 1 - max_freq > k:
+            counts[s[left]] -= 1
+            left += 1
+        best = max(best, right - left + 1)
+    return best
+
+
+assert character_replacement("ABAB", 2) == 4
+assert character_replacement("AABABBA", 1) == 4
+assert character_replacement("", 3) == 0
+```
+
+Complexity: O(n) time, O(26) space.
+F:
+- Explain why a stale `max_freq` is still correct.
+
+@@ Permutation in String | Medium | Fixed window
+Q: Return whether `s2` contains a permutation of `s1` as a substring.
+
+Example: `"ab", "eidbaooo"` → `True`
+A:
+Approach: a fixed window of length `len(s1)`, compared against `s1`'s character counts as the window slides.
+
+```python
+from collections import Counter
+
+
+def check_inclusion(s1: str, s2: str) -> bool:
+    k = len(s1)
+    if k > len(s2):
+        return False
+    need, window = Counter(s1), Counter(s2[:k])
+    if window == need:
+        return True
+    for i in range(k, len(s2)):
+        window[s2[i]] += 1
+        out = s2[i - k]
+        window[out] -= 1
+        if window[out] == 0:
+            del window[out]
+        if window == need:
+            return True
+    return False
+
+
+assert check_inclusion("ab", "eidbaooo")
+assert not check_inclusion("ab", "eidboaoo")
+assert not check_inclusion("abc", "ab")
+```
+
+Complexity: O(n·26) with Counter comparison. Tracking a `matches` counter makes it O(n).
+
+Deleting zero counts keeps the equality check correct and fast.
+F:
+- Return all start indices (Find All Anagrams in a String).
+- The O(n) matches-counter variant.
+
+@@ Find All Anagrams in a String | Medium | Fixed window
+Q: Return all start indices in `s` where an anagram of `p` begins.
+
+Example: `s = "cbaebabacd", p = "abc"` → `[0, 6]`
+A:
+Approach: a fixed window with 26-slot count arrays. Comparing two fixed-size lists costs O(26).
+
+```python
+def find_anagrams(s: str, p: str) -> list[int]:
+    k, out = len(p), []
+    if k > len(s):
+        return out
+    need, win = [0] * 26, [0] * 26
+    for ch in p:
+        need[ord(ch) - 97] += 1
+    for i, ch in enumerate(s):
+        win[ord(ch) - 97] += 1
+        if i >= k:
+            win[ord(s[i - k]) - 97] -= 1
+        if i >= k - 1 and win == need:
+            out.append(i - k + 1)
+    return out
+
+
+assert find_anagrams("cbaebabacd", "abc") == [0, 6]
+assert find_anagrams("abab", "ab") == [0, 1, 2]
+assert find_anagrams("a", "ab") == []
+```
+
+Complexity: O(26·n) time, O(1) space.
+F:
+- Unicode input (use a Counter-based window).
+
+@@ Minimum Window Substring | Hard | Variable window
+Q: Return the smallest substring of `s` that contains every character of `t`, including duplicates, or `""`.
+
+Example: `s = "ADOBECODEBANC", t = "ABC"` → `"BANC"`
+A:
+Approach: expand `right` and track how many required characters are still `missing`. When it hits 0, shrink `left` past surplus characters (need < 0), record the window, then give up the left character and continue.
+
+```python
+from collections import Counter
+
+
+def min_window(s: str, t: str) -> str:
+    if not s or not t:
+        return ""
+    need = Counter(t)
+    missing = len(t)
+    left, best = 0, (0, -1)
+    for right, ch in enumerate(s):
+        if need[ch] > 0:
+            missing -= 1
+        need[ch] -= 1
+        if missing == 0:
+            while need[s[left]] < 0:
+                need[s[left]] += 1
+                left += 1
+            if best[1] == -1 or right - left < best[1] - best[0]:
+                best = (left, right)
+            need[s[left]] += 1
+            missing += 1
+            left += 1
+    return s[best[0]:best[1] + 1] if best[1] != -1 else ""
+
+
+assert min_window("ADOBECODEBANC", "ABC") == "BANC"
+assert min_window("a", "a") == "a"
+assert min_window("a", "aa") == ""
+assert min_window("aa", "aa") == "aa"
+```
+
+Complexity: O(|s| + |t|).
+
+Talk through the invariant: `need[c] > 0` means the window still lacks c, and `need[c] < 0` means it has c to spare.
+F:
+- Smallest window containing all distinct characters of `s` itself.
+- The same problem with a sequence order constraint (Minimum Window Subsequence, DP).
+
+@@ Sliding Window Maximum | Hard | Monotonic deque
+Q: Return the maximum of every window of size `k`.
+
+Example: `[1,3,-1,-3,5,3,6,7], k = 3` → `[3,3,5,5,6,7]`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: a deque of indices whose values decrease from front to back. Pop smaller values from the back, since they can never be a maximum again, and pop the front when it leaves the window.
+
+```python
+from collections import deque
+
+
+def max_sliding_window(nums: list[int], k: int) -> list[int]:
+    dq: deque[int] = deque()
+    out: list[int] = []
+    for i, x in enumerate(nums):
+        while dq and nums[dq[-1]] <= x:
+            dq.pop()
+        dq.append(i)
+        if dq[0] <= i - k:
+            dq.popleft()
+        if i >= k - 1:
+            out.append(nums[dq[0]])
+    return out
+
+
+assert max_sliding_window([1, 3, -1, -3, 5, 3, 6, 7], 3) == [3, 3, 5, 5, 6, 7]
+assert max_sliding_window([1], 1) == [1]
+assert max_sliding_window([9, 8, 7, 6], 2) == [9, 8, 7]
+```
+
+Complexity: O(n), since each index is pushed and popped at most once. A heap gives O(n log n).
+F:
+- Rolling max latency over the last 60 seconds of a metrics stream (time-based windows).
+- Sliding window minimum and maximum together (two deques).
+
+@@ Maximum Sum of Distinct Subarrays With Length K | Medium | Fixed window
+Q: Return the maximum sum of any length-`k` subarray whose elements are all distinct, or 0.
+
+Example: `[1,5,4,2,9,9,9], k = 3` → `15`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: a fixed window with a running sum and value counts. A window is valid when it holds `k` distinct keys.
+
+```python
+from collections import Counter
+
+
+def maximum_subarray_sum(nums: list[int], k: int) -> int:
+    counts: Counter[int] = Counter()
+    window = best = 0
+    for i, x in enumerate(nums):
+        counts[x] += 1
+        window += x
+        if i >= k:
+            y = nums[i - k]
+            counts[y] -= 1
+            window -= y
+            if counts[y] == 0:
+                del counts[y]
+        if i >= k - 1 and len(counts) == k:
+            best = max(best, window)
+    return best
+
+
+assert maximum_subarray_sum([1, 5, 4, 2, 9, 9, 9], 3) == 15
+assert maximum_subarray_sum([4, 4, 4], 3) == 0
+assert maximum_subarray_sum([1, 2, 3], 1) == 3
+```
+
+Complexity: O(n) time, O(k) space.
+F:
+- At most m duplicates allowed in the window.
+
+@@ Get Equal Substrings Within Budget | Medium | Variable window
+Q: Changing `s[i]` to `t[i]` costs `|s[i] - t[i]|`. Return the maximum length of a substring of `s` that can be changed into the matching substring of `t` with total cost ≤ `max_cost`.
+
+Example: `"abcd", "bcdf", 3` → `3`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: this is the longest subarray of costs with sum ≤ budget. Costs are non-negative, so a shrinking window works.
+
+```python
+def equal_substring(s: str, t: str, max_cost: int) -> int:
+    left = cost = best = 0
+    for right in range(len(s)):
+        cost += abs(ord(s[right]) - ord(t[right]))
+        while cost > max_cost:
+            cost -= abs(ord(s[left]) - ord(t[left]))
+            left += 1
+        best = max(best, right - left + 1)
+    return best
+
+
+assert equal_substring("abcd", "bcdf", 3) == 3
+assert equal_substring("abcd", "cdef", 3) == 1
+assert equal_substring("abcd", "acde", 0) == 1
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Budget framing: the longest run of days whose spending stays under a limit.
+
+@@ Max Consecutive Ones III | Medium | Variable window
+Q: Given a binary array, you may flip at most `k` zeros. Return the longest run of 1s you can make.
+
+Example: `[1,1,1,0,0,0,1,1,1,1,0], k = 2` → `6`
+A:
+Approach: find the longest window containing at most `k` zeros.
+
+```python
+def longest_ones(nums: list[int], k: int) -> int:
+    left = zeros = best = 0
+    for right, x in enumerate(nums):
+        zeros += x == 0
+        while zeros > k:
+            zeros -= nums[left] == 0
+            left += 1
+        best = max(best, right - left + 1)
+    return best
+
+
+assert longest_ones([1, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0], 2) == 6
+assert longest_ones([0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1], 3) == 10
+assert longest_ones([0, 0], 0) == 0
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Streaming input where you can't store the array (keep a queue of zero positions).
+
+@@ Fruit Into Baskets | Medium | Variable window
+Q: You have two baskets, and each holds one fruit type. Walking right from any tree, pick one fruit per tree until you meet a third type. Return the maximum number of fruits.
+
+Example: `[1,2,3,2,2]` → `4`
+A:
+Approach: this is the longest subarray with at most 2 distinct values.
+
+```python
+from collections import Counter
+
+
+def total_fruit(fruits: list[int]) -> int:
+    basket: Counter[int] = Counter()
+    left = best = 0
+    for right, f in enumerate(fruits):
+        basket[f] += 1
+        while len(basket) > 2:
+            basket[fruits[left]] -= 1
+            if basket[fruits[left]] == 0:
+                del basket[fruits[left]]
+            left += 1
+        best = max(best, right - left + 1)
+    return best
+
+
+assert total_fruit([1, 2, 1]) == 3
+assert total_fruit([0, 1, 2, 2]) == 3
+assert total_fruit([1, 2, 3, 2, 2]) == 4
+```
+
+Complexity: O(n).
+F:
+- Generalise to k baskets.
+
+@@ Longest Substring with At Most K Distinct Characters | Medium | Variable window
+Q: Return the length of the longest substring with at most `k` distinct characters.
+
+Example: `"eceba", k = 2` → `3`
+A:
+Approach: a window with a last-index map. When the window holds more than k distinct characters, evict the one whose last occurrence is leftmost. This moves `left` in one jump.
+
+```python
+def length_of_longest_substring_k_distinct(s: str, k: int) -> int:
+    if k == 0:
+        return 0
+    last: dict[str, int] = {}
+    left = best = 0
+    for right, ch in enumerate(s):
+        last.pop(ch, None)
+        last[ch] = right
+        if len(last) > k:
+            _, idx = next(iter(last.items()))
+            del last[s[idx]]
+            left = idx + 1
+        best = max(best, right - left + 1)
+    return best
+
+
+assert length_of_longest_substring_k_distinct("eceba", 2) == 3
+assert length_of_longest_substring_k_distinct("aa", 1) == 2
+assert length_of_longest_substring_k_distinct("", 2) == 0
+assert length_of_longest_substring_k_distinct("abc", 0) == 0
+```
+
+Complexity: O(n). Python dicts preserve insertion order, so popping and re-inserting a key moves it to the end, like an LRU list.
+F:
+- How does this relate to an LRU cache?
+
+@@ Subarrays with K Different Integers | Hard | Window counting trick
+Q: Count the subarrays with exactly `k` distinct integers.
+
+Example: `[1,2,1,2,3], k = 2` → `7`
+A:
+Approach: exactly(k) = at_most(k) - at_most(k-1). In an at-most window ending at `right`, every start from `left` to `right` is valid, which gives `right - left + 1` subarrays.
+
+```python
+from collections import Counter
+
+
+def subarrays_with_k_distinct(nums: list[int], k: int) -> int:
+    def at_most(m: int) -> int:
+        counts: Counter[int] = Counter()
+        left = total = 0
+        for right, x in enumerate(nums):
+            counts[x] += 1
+            while len(counts) > m:
+                counts[nums[left]] -= 1
+                if counts[nums[left]] == 0:
+                    del counts[nums[left]]
+                left += 1
+            total += right - left + 1
+        return total
+
+    return at_most(k) - at_most(k - 1)
+
+
+assert subarrays_with_k_distinct([1, 2, 1, 2, 3], 2) == 7
+assert subarrays_with_k_distinct([1, 2, 1, 3, 4], 3) == 3
+```
+
+Complexity: O(n).
+F:
+- Why can't a single window count "exactly k" directly?
+
+@@ Count Number of Nice Subarrays | Medium | Prefix counts
+Q: Count the subarrays that contain exactly `k` odd numbers.
+
+Example: `[1,1,2,1,1], k = 3` → `2`
+A:
+Approach: map each number to a parity bit and count subarrays with sum k, using prefix-count hashing.
+
+```python
+from collections import Counter
+
+
+def number_of_subarrays(nums: list[int], k: int) -> int:
+    seen: Counter[int] = Counter({0: 1})
+    odd = total = 0
+    for x in nums:
+        odd += x & 1
+        total += seen[odd - k]
+        seen[odd] += 1
+    return total
+
+
+assert number_of_subarrays([1, 1, 2, 1, 1], 3) == 2
+assert number_of_subarrays([2, 4, 6], 1) == 0
+assert number_of_subarrays([2, 2, 2, 1, 2, 2, 1, 2, 2, 2], 2) == 16
+```
+
+Complexity: O(n) time, O(n) space. The at-most-k window trick also works, in O(1) space.
+F:
+- Show the at_most(k) - at_most(k-1) version.
+
+@@ Maximum Points You Can Obtain from Cards | Medium | Complement window
+Q: Take exactly `k` cards, each from either end of the row. Maximise the total points.
+
+Example: `[1,2,3,4,5,6,1], k = 3` → `12`
+A:
+Approach: the cards left behind form a contiguous window of `n-k` cards. Minimise that window's sum and subtract it from the total.
+
+```python
+def max_score_cards(card_points: list[int], k: int) -> int:
+    n, total = len(card_points), sum(card_points)
+    w = n - k
+    if w == 0:
+        return total
+    cur = low = sum(card_points[:w])
+    for i in range(w, n):
+        cur += card_points[i] - card_points[i - w]
+        low = min(low, cur)
+    return total - low
+
+
+assert max_score_cards([1, 2, 3, 4, 5, 6, 1], 3) == 12
+assert max_score_cards([2, 2, 2], 2) == 4
+assert max_score_cards([9, 7, 7, 9, 7, 7, 9], 7) == 55
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- The direct version: try i cards from the left and k-i from the right using prefix sums.
+
+@@ Minimum Operations to Reduce X to Zero | Medium | Complement window
+Q: Each operation removes the leftmost or rightmost element and subtracts it from `x`. Return the minimum number of operations to reduce `x` to exactly 0, or `-1`.
+
+Example: `[1,1,4,2,3], x = 5` → `2`
+A:
+Approach: the elements you keep form a middle window with sum `total - x`. Find the longest such window (values are positive, so a sliding window works).
+
+```python
+def min_operations_reduce_x(nums: list[int], x: int) -> int:
+    target = sum(nums) - x
+    if target < 0:
+        return -1
+    if target == 0:
+        return len(nums)
+    left = cur = 0
+    best = -1
+    for right, v in enumerate(nums):
+        cur += v
+        while cur > target:
+            cur -= nums[left]
+            left += 1
+        if cur == target:
+            best = max(best, right - left + 1)
+    return -1 if best == -1 else len(nums) - best
+
+
+assert min_operations_reduce_x([1, 1, 4, 2, 3], 5) == 2
+assert min_operations_reduce_x([5, 6, 7, 8, 9], 4) == -1
+assert min_operations_reduce_x([3, 2, 20, 1, 1, 3], 10) == 5
+assert min_operations_reduce_x([1, 1], 2) == 2
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Reframing ("take from the ends" becomes "keep the middle") is a reusable trick. Where else does it apply?
+
+@@ Grumpy Bookstore Owner | Medium | Fixed window
+Q: `customers[i]` customers arrive in minute i. When `grumpy[i] == 1` they are unsatisfied. The owner can suppress grumpiness for one block of `minutes` consecutive minutes. Maximise the number of satisfied customers.
+
+Example: `customers=[1,0,1,2,1,1,7,5], grumpy=[0,1,0,1,0,1,0,1], minutes=3` → `16`
+A:
+Approach: the base is the customers already satisfied. Slide a window to find the maximum extra customers recovered in grumpy minutes.
+
+```python
+def max_satisfied(customers: list[int], grumpy: list[int], minutes: int) -> int:
+    base = sum(c for c, g in zip(customers, grumpy) if not g)
+    extra = best = 0
+    for i, (c, g) in enumerate(zip(customers, grumpy)):
+        extra += c * g
+        if i >= minutes:
+            extra -= customers[i - minutes] * grumpy[i - minutes]
+        best = max(best, extra)
+    return base + best
+
+
+assert max_satisfied([1, 0, 1, 2, 1, 1, 7, 5], [0, 1, 0, 1, 0, 1, 0, 1], 3) == 16
+assert max_satisfied([1], [0], 1) == 1
+```
+
+Complexity: O(n).
+F:
+- An operations framing: where should you schedule a one-hour boost of capacity?
+
+@@ Longest Subarray of 1's After Deleting One Element | Medium | Variable window
+Q: Delete exactly one element from a binary array. Return the length of the longest run of 1s in the result.
+
+Example: `[0,1,1,1,0,1,1,0,1]` → `5`
+A:
+Approach: find the longest window with at most one zero. The answer is the window length minus 1, because one element must be deleted even when the array is all 1s.
+
+```python
+def longest_subarray_after_delete(nums: list[int]) -> int:
+    left = zeros = best = 0
+    for right, x in enumerate(nums):
+        zeros += x == 0
+        while zeros > 1:
+            zeros -= nums[left] == 0
+            left += 1
+        best = max(best, right - left)
+    return best
+
+
+assert longest_subarray_after_delete([1, 1, 0, 1]) == 3
+assert longest_subarray_after_delete([0, 1, 1, 1, 0, 1, 1, 0, 1]) == 5
+assert longest_subarray_after_delete([1, 1, 1]) == 2
+```
+
+Complexity: O(n).
+F:
+- Why is `right - left` (not `+ 1`) the answer?
+
+@@ Number of Substrings Containing All Three Characters | Medium | Last-seen indices
+Q: `s` contains only `a`, `b` and `c`. Count the substrings that contain at least one of each.
+
+Example: `"abcabc"` → `10`
+A:
+Approach: for each end index `i`, any start ≤ `min(last_a, last_b, last_c)` works, so add `min(...) + 1`.
+
+```python
+def number_of_substrings(s: str) -> int:
+    last = {"a": -1, "b": -1, "c": -1}
+    total = 0
+    for i, ch in enumerate(s):
+        last[ch] = i
+        total += min(last.values()) + 1
+    return total
+
+
+assert number_of_substrings("abcabc") == 10
+assert number_of_substrings("aaacb") == 3
+assert number_of_substrings("abc") == 1
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- The equivalent sliding-window solution.
+
+@@ Sliding Window Median | Hard | Order statistics
+Q: Return the median of every window of size `k`.
+
+Example: `[1,3,-1,-3,5,3,6,7], k = 3` → `[1,-1,-1,3,5,6]`
+A:
+Approach (interview-friendly): keep the window in a sorted list, updating it with `bisect.insort` and positional removal. This is O(n·k), which is fine for moderate k. The optimal approach uses two heaps with lazy deletion, or a sorted container, for O(n log k).
+
+```python
+from bisect import bisect_left, insort
+
+
+def median_sliding_window(nums: list[int], k: int) -> list[float]:
+    window = sorted(nums[:k])
+
+    def median() -> float:
+        if k % 2:
+            return float(window[k // 2])
+        return (window[k // 2 - 1] + window[k // 2]) / 2
+
+    out = [median()]
+    for i in range(k, len(nums)):
+        window.pop(bisect_left(window, nums[i - k]))
+        insort(window, nums[i])
+        out.append(median())
+    return out
+
+
+assert median_sliding_window([1, 3, -1, -3, 5, 3, 6, 7], 3) == [1.0, -1.0, -1.0, 3.0, 5.0, 6.0]
+assert median_sliding_window([1, 2, 3, 4, 2, 3, 1, 4, 2], 3) == [2, 3, 3, 3, 2, 3, 2]
+assert median_sliding_window([1, 4, 2, 3], 4) == [2.5]
+```
+
+Complexity: O(n·k) for list shifting, although `insort` is fast in practice because it is a C memmove.
+F:
+- Explain the two-heap lazy-deletion design.
+- A rolling p50 or p99 latency over a stream (t-digest or HDR histogram in production).
+
+@@ Contains Duplicate II | Easy | Hash map window
+Q: Return whether there are indices i ≠ j with `nums[i] == nums[j]` and `|i - j| ≤ k`.
+
+Example: `[1,2,3,1], k = 3` → `True`
+A:
+```python
+def contains_nearby_duplicate(nums: list[int], k: int) -> bool:
+    last: dict[int, int] = {}
+    for i, x in enumerate(nums):
+        if x in last and i - last[x] <= k:
+            return True
+        last[x] = i
+    return False
+
+
+assert contains_nearby_duplicate([1, 2, 3, 1], 3)
+assert contains_nearby_duplicate([1, 0, 1, 1], 1)
+assert not contains_nearby_duplicate([1, 2, 3, 1, 2, 3], 2)
+```
+
+Complexity: O(n) time. A bounded set of the last k values uses O(k) space.
+F:
+- Duplicate-payment detection: the same amount to the same payee within 10 minutes.
+
+@@ Repeated DNA Sequences | Medium | Rolling hash
+Q: Return all 10-letter substrings that occur more than once in a DNA string.
+
+Example: `"AAAAACCCCCAAAAACCCCCCAAAAAGGGTTT"` → `["AAAAACCCCC","CCCCCAAAAA"]`
+A:
+Approach: slide a length-10 window with seen and repeated sets. For very large inputs, encode each base in 2 bits so every window is a 20-bit integer rolling hash.
+
+```python
+def find_repeated_dna_sequences(s: str) -> list[str]:
+    seen, repeated = set(), set()
+    for i in range(len(s) - 9):
+        chunk = s[i:i + 10]
+        if chunk in seen:
+            repeated.add(chunk)
+        seen.add(chunk)
+    return sorted(repeated)
+
+
+def find_repeated_dna_bits(s: str) -> list[str]:
+    code = {"A": 0, "C": 1, "G": 2, "T": 3}
+    mask, h = (1 << 20) - 1, 0
+    seen, repeated = set(), set()
+    for i, ch in enumerate(s):
+        h = ((h << 2) | code[ch]) & mask
+        if i >= 9:
+            if h in seen:
+                repeated.add(s[i - 9:i + 1])
+            seen.add(h)
+    return sorted(repeated)
+
+
+for f in (find_repeated_dna_sequences, find_repeated_dna_bits):
+    assert f("AAAAACCCCCAAAAACCCCCCAAAAAGGGTTT") == ["AAAAACCCCC", "CCCCCAAAAA"]
+    assert f("AAAAAAAAAAAAA") == ["AAAAAAAAAA"]
+    assert f("ACGT") == []
+```
+
+Complexity: O(n·10) for the slicing version and O(n) for the bitmask version.
+F:
+- Rabin-Karp for arbitrary pattern lengths.
+
+@@ Maximum Number of Vowels in a Substring of Given Length | Medium | Fixed window
+Q: Return the maximum number of vowels in any substring of length `k`.
+
+Example: `"abciiidef", k = 3` → `3`
+A:
+```python
+def max_vowels(s: str, k: int) -> int:
+    vowels = set("aeiou")
+    cur = sum(ch in vowels for ch in s[:k])
+    best = cur
+    for i in range(k, len(s)):
+        cur += (s[i] in vowels) - (s[i - k] in vowels)
+        best = max(best, cur)
+    return best
+
+
+assert max_vowels("abciiidef", 3) == 3
+assert max_vowels("aeiou", 2) == 2
+assert max_vowels("leetcode", 3) == 2
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Early exit when `best == k`.
+
+@@ Moving Average from Data Stream | Easy | Queue window
+Q: Implement `MovingAverage(size)` with `next(val)` returning the average of the last `size` values.
+
+Example: size 3: `next(1)=1.0, next(10)=5.5, next(3)=4.67, next(5)=6.0`
+A:
+Approach: a deque with `maxlen` plus a running sum, giving O(1) per call. This is the building block of rolling metrics such as average latency per model deployment.
+
+```python
+from collections import deque
+
+
+class MovingAverage:
+    def __init__(self, size: int) -> None:
+        if size <= 0:
+            raise ValueError("size must be positive")
+        self._window: deque[float] = deque()
+        self._size = size
+        self._sum = 0.0
+
+    def next(self, val: float) -> float:
+        self._window.append(val)
+        self._sum += val
+        if len(self._window) > self._size:
+            self._sum -= self._window.popleft()
+        return self._sum / len(self._window)
+
+
+m = MovingAverage(3)
+assert m.next(1) == 1.0
+assert m.next(10) == 5.5
+assert abs(m.next(3) - 14 / 3) < 1e-9
+assert m.next(5) == 6.0
+```
+
+Complexity: O(1) per call, O(size) space.
+
+Note: a running float sum accumulates rounding error over millions of updates. Recompute periodically, or use integers or `math.fsum`.
+F:
+- A time-based window ("the last 60 seconds") with irregular arrivals.
+- An exponentially weighted moving average, which needs O(1) memory.
+
+@@ Subarray Sum Equals K | Medium | Prefix sum hashing
+Q: Count the contiguous subarrays whose sum equals `k`. Values may be negative.
+
+Example: `[1,1,1], k = 2` → `2`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: `sum(i..j) = prefix[j] - prefix[i-1]`. While scanning, count earlier prefixes equal to `prefix - k`. Seed the map with `{0: 1}` for subarrays that start at index 0.
+
+```python
+from collections import Counter
+
+
+def subarray_sum(nums: list[int], k: int) -> int:
+    seen: Counter[int] = Counter({0: 1})
+    prefix = total = 0
+    for x in nums:
+        prefix += x
+        total += seen[prefix - k]
+        seen[prefix] += 1
+    return total
+
+
+assert subarray_sum([1, 1, 1], 2) == 2
+assert subarray_sum([1, 2, 3], 3) == 2
+assert subarray_sum([1, -1, 0], 0) == 3
+assert subarray_sum([], 0) == 0
+```
+
+Complexity: O(n) time, O(n) space.
+
+Why not a sliding window: negatives break the monotonicity that sliding windows rely on.
+F:
+- Return the longest such subarray (store the first index of each prefix).
+- Count submatrices that sum to target (compress rows, then apply this).
+
+@@ Subarray Sums Divisible by K | Medium | Prefix sum modulo
+Q: Count the subarrays whose sum is divisible by `k`.
+
+Example: `[4,5,0,-2,-3,1], k = 5` → `7`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: two prefixes with the same remainder bound a divisible subarray. Count the remainders. Python's `%` always returns a non-negative result for positive k, which avoids the negative-remainder bug found in Java and C.
+
+```python
+def subarrays_div_by_k(nums: list[int], k: int) -> int:
+    counts = [0] * k
+    counts[0] = 1
+    prefix = total = 0
+    for x in nums:
+        prefix = (prefix + x) % k
+        total += counts[prefix]
+        counts[prefix] += 1
+    return total
+
+
+assert subarrays_div_by_k([4, 5, 0, -2, -3, 1], 5) == 7
+assert subarrays_div_by_k([5], 9) == 0
+assert subarrays_div_by_k([-1, 2, 9], 2) == 2
+```
+
+Complexity: O(n) time, O(k) space.
+F:
+- In Java: `((prefix % k) + k) % k`. Why is that needed?
+
+@@ Contiguous Array | Medium | Prefix sum balance
+Q: Return the length of the longest subarray with an equal number of 0s and 1s.
+
+Example: `[0,0,1,0,0,0,1,1]` → `6`
+A:
+Approach: count 0 as -1 and 1 as +1. Equal counts means a zero-sum subarray, so find the longest span between two equal balances by storing the first index of each balance.
+
+```python
+def find_max_length(nums: list[int]) -> int:
+    first = {0: -1}
+    balance = best = 0
+    for i, x in enumerate(nums):
+        balance += 1 if x else -1
+        if balance in first:
+            best = max(best, i - first[balance])
+        else:
+            first[balance] = i
+    return best
+
+
+assert find_max_length([0, 1]) == 2
+assert find_max_length([0, 1, 0]) == 2
+assert find_max_length([0, 0, 1, 0, 0, 0, 1, 1]) == 6
+assert find_max_length([1, 1, 1]) == 0
+```
+
+Complexity: O(n) time, O(n) space.
+F:
+- Why store only the first index?
+
+@@ Number of Ways to Split Array | Medium | Prefix sums
+Q: Count the split points i (with `0 ≤ i < n-1`) where the sum of the first i+1 elements is ≥ the sum of the rest.
+
+Example: `[10,4,-8,7]` → `2`
+A:
+Seen in: JPMorgan-tagged list.
+
+```python
+def ways_to_split_array(nums: list[int]) -> int:
+    total, left, count = sum(nums), 0, 0
+    for x in nums[:-1]:
+        left += x
+        if left >= total - left:
+            count += 1
+    return count
+
+
+assert ways_to_split_array([10, 4, -8, 7]) == 2
+assert ways_to_split_array([2, 3, 1, 0]) == 2
+assert ways_to_split_array([1, 1]) == 1
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Split into three parts with left ≤ mid ≤ right (prefix sums plus binary search).
+
+@@ Range Sum Query - Immutable | Easy | Prefix sums
+Q: Design `NumArray(nums)` with `sum_range(left, right)` (inclusive) in O(1) per query.
+A:
+Approach: precompute `prefix[i]` as the sum of the first i elements. Then `sum(l..r) = prefix[r+1] - prefix[l]`. The leading 0 removes edge cases.
+
+```python
+from itertools import accumulate
+
+
+class NumArray:
+    def __init__(self, nums: list[int]) -> None:
+        self._prefix = [0, *accumulate(nums)]
+
+    def sum_range(self, left: int, right: int) -> int:
+        return self._prefix[right + 1] - self._prefix[left]
+
+
+na = NumArray([-2, 0, 3, -5, 2, -1])
+assert na.sum_range(0, 2) == 1
+assert na.sum_range(2, 5) == -1
+assert na.sum_range(0, 5) == -3
+```
+
+Complexity: O(n) to build, O(1) per query.
+F:
+- With point updates (Fenwick or segment tree, O(log n)).
+- A daily-balance table where the query is "total inflow between two dates".
+
+@@ Range Sum Query 2D - Immutable | Medium | 2-D prefix sums
+Q: Design `NumMatrix(matrix)` with `sum_region(r1, c1, r2, c2)` (inclusive corners) in O(1).
+A:
+Approach: `P[r][c]` is the sum of the rectangle from (0,0) to (r-1,c-1), with one padding row and column. Answer by inclusion-exclusion: `P[r2+1][c2+1] - P[r1][c2+1] - P[r2+1][c1] + P[r1][c1]`.
+
+```python
+class NumMatrix:
+    def __init__(self, matrix: list[list[int]]) -> None:
+        rows, cols = len(matrix), len(matrix[0]) if matrix else 0
+        self._p = [[0] * (cols + 1) for _ in range(rows + 1)]
+        for r in range(rows):
+            for c in range(cols):
+                self._p[r + 1][c + 1] = (matrix[r][c] + self._p[r][c + 1]
+                                         + self._p[r + 1][c] - self._p[r][c])
+
+    def sum_region(self, r1: int, c1: int, r2: int, c2: int) -> int:
+        p = self._p
+        return p[r2 + 1][c2 + 1] - p[r1][c2 + 1] - p[r2 + 1][c1] + p[r1][c1]
+
+
+nm = NumMatrix([[3, 0, 1, 4, 2], [5, 6, 3, 2, 1], [1, 2, 0, 1, 5], [4, 1, 0, 1, 7], [1, 0, 3, 0, 5]])
+assert nm.sum_region(2, 1, 4, 3) == 8
+assert nm.sum_region(1, 1, 2, 2) == 11
+assert nm.sum_region(1, 2, 2, 4) == 12
+```
+
+Complexity: O(m·n) to build, O(1) per query.
+F:
+- Mutable version (2-D Fenwick tree).
+- Maximum-sum rectangle no larger than k.
+
+@@ Continuous Subarray Sum | Medium | Prefix sum modulo
+Q: Return whether there is a subarray of length at least 2 whose sum is a multiple of `k`.
+
+Example: `[23,2,4,6,7], k = 6` → `True`
+A:
+Approach: store the first index of each prefix remainder. If the same remainder appears again at least 2 positions later, the sum between them is divisible by k. Seeding `{0: -1}` handles prefixes that start at index 0.
+
+```python
+def check_subarray_sum(nums: list[int], k: int) -> bool:
+    first = {0: -1}
+    prefix = 0
+    for i, x in enumerate(nums):
+        prefix = (prefix + x) % k
+        if prefix in first:
+            if i - first[prefix] >= 2:
+                return True
+        else:
+            first[prefix] = i
+    return False
+
+
+assert check_subarray_sum([23, 2, 4, 6, 7], 6)
+assert check_subarray_sum([23, 2, 6, 4, 7], 6)
+assert not check_subarray_sum([23, 2, 6, 4, 7], 13)
+assert check_subarray_sum([5, 0, 0, 0], 3)
+assert not check_subarray_sum([0], 1)
+```
+
+Complexity: O(n) time, O(min(n, k)) space.
+F:
+- Why must you keep the first index rather than updating it?
+
+@@ Maximum Size Subarray Sum Equals k | Medium | Prefix sum hashing
+Q: Return the length of the longest subarray that sums to `k`. Values may be negative.
+
+Example: `[1,-1,5,-2,3], k = 3` → `4`
+A:
+```python
+def max_sub_array_len(nums: list[int], k: int) -> int:
+    first = {0: -1}
+    prefix = best = 0
+    for i, x in enumerate(nums):
+        prefix += x
+        if prefix - k in first:
+            best = max(best, i - first[prefix - k])
+        first.setdefault(prefix, i)
+    return best
+
+
+assert max_sub_array_len([1, -1, 5, -2, 3], 3) == 4
+assert max_sub_array_len([-2, -1, 2, 1], 1) == 2
+assert max_sub_array_len([1, 2], 10) == 0
+```
+
+Complexity: O(n) time and space.
+F:
+- The shortest subarray instead (store the latest index).
+
+@@ Car Pooling | Medium | Sweep line
+Q: `trips[i] = [passengers, from, to]`. A car with `capacity` seats drives east only. Can it complete every trip? Passengers get off at `to` before others board there.
+A:
+Approach: turn each trip into events `(from, +p)` and `(to, -p)`. Sort them and keep a running load. Because drop-offs have negative deltas, a tuple sort puts them before pick-ups at the same location, which matches the rule.
+
+```python
+def car_pooling(trips: list[list[int]], capacity: int) -> bool:
+    events = []
+    for p, start, end in trips:
+        events.append((start, p))
+        events.append((end, -p))
+    load = 0
+    for _, delta in sorted(events):
+        load += delta
+        if load > capacity:
+            return False
+    return True
+
+
+assert not car_pooling([[2, 1, 5], [3, 3, 7]], 4)
+assert car_pooling([[2, 1, 5], [3, 3, 7]], 5)
+assert car_pooling([[2, 1, 5], [3, 5, 7]], 3)
+```
+
+Complexity: O(n log n). With small location bounds (≤ 1000), a difference array gives O(n + L).
+F:
+- The difference-array version.
+- Capacity planning: peak concurrent LLM requests per deployment from request logs.
+
+@@ Corporate Flight Bookings | Medium | Difference array
+Q: `bookings[i] = [first, last, seats]` books `seats` on every flight from `first` to `last` (1-indexed). Return the total seats on each of the `n` flights.
+
+Example: `[[1,2,10],[2,3,20],[2,5,25]], n = 5` → `[10,55,45,25,25]`
+A:
+Approach: difference array. Add at `first`, subtract after `last`, then take the prefix sum. Each range update becomes O(1).
+
+```python
+from itertools import accumulate
+
+
+def corp_flight_bookings(bookings: list[list[int]], n: int) -> list[int]:
+    diff = [0] * (n + 1)
+    for first, last, seats in bookings:
+        diff[first - 1] += seats
+        diff[last] -= seats
+    return list(accumulate(diff[:n]))
+
+
+assert corp_flight_bookings([[1, 2, 10], [2, 3, 20], [2, 5, 25]], 5) == [10, 55, 45, 25, 25]
+assert corp_flight_bookings([[1, 2, 10], [2, 2, 15]], 2) == [10, 25]
+```
+
+Complexity: O(n + b).
+F:
+- 2-D difference arrays (for example, heat-map updates).
+
+@@ Find the Highest Altitude | Easy | Prefix sums
+Q: A biker starts at altitude 0 and `gain[i]` is the net gain between points i and i+1. Return the highest altitude reached.
+
+Example: `[-5,1,5,0,-7]` → `1`
+A:
+```python
+from itertools import accumulate
+
+
+def largest_altitude(gain: list[int]) -> int:
+    return max(0, *accumulate(gain)) if gain else 0
+
+
+assert largest_altitude([-5, 1, 5, 0, -7]) == 1
+assert largest_altitude([-4, -3, -2, -1, 4, 3, 2]) == 0
+assert largest_altitude([]) == 0
+```
+
+Complexity: O(n).
+F:
+- Peak account balance from a list of deltas.
+
+@@ Minimum Value to Get Positive Step by Step Sum | Easy | Prefix sums
+Q: Find the minimum positive `start` so that `start + prefix_sum` stays ≥ 1 at every step.
+
+Example: `[-3,2,-3,4,2]` → `5`
+A:
+Banking framing: the smallest opening balance that keeps an account from ever dropping below 1 given a list of transactions.
+
+```python
+from itertools import accumulate
+
+
+def min_start_value(nums: list[int]) -> int:
+    lowest = min(0, *accumulate(nums)) if nums else 0
+    return 1 - lowest
+
+
+assert min_start_value([-3, 2, -3, 4, 2]) == 5
+assert min_start_value([1, 2]) == 1
+assert min_start_value([1, -2, -3]) == 5
+```
+
+Complexity: O(n).
+F:
+- Transactions arrive out of order and must be sorted by timestamp first.
+- Per-account version over a big table (a SQL window function running sum).
+
+@@ Count Vowel Strings in Ranges | Medium | Prefix counts
+Q: For each query `[l, r]`, count the words in `words[l..r]` that start and end with a vowel.
+
+Example: `["aba","bcb","ece","aa","e"], [[0,2],[1,4],[1,1]]` → `[2,3,0]`
+A:
+```python
+from itertools import accumulate
+
+
+def vowel_strings(words: list[str], queries: list[list[int]]) -> list[int]:
+    vowels = set("aeiou")
+    flags = [w[0] in vowels and w[-1] in vowels for w in words]
+    prefix = [0, *accumulate(flags)]
+    return [prefix[r + 1] - prefix[l] for l, r in queries]
+
+
+assert vowel_strings(["aba", "bcb", "ece", "aa", "e"], [[0, 2], [1, 4], [1, 1]]) == [2, 3, 0]
+assert vowel_strings(["a", "e", "i"], [[0, 2], [0, 1], [2, 2]]) == [3, 2, 1]
+```
+
+Complexity: O(n + q).
+F:
+- Prefix counts are a general trick. Name two other problems where they apply.
+
+@@ Longest Well-Performing Interval | Medium | Prefix sum with first-index map
+Q: A day is tiring if hours > 8. A well-performing interval has strictly more tiring days than non-tiring days. Return the longest one.
+
+Example: `[9,9,6,0,6,6,9]` → `3`
+A:
+Approach: score +1 for a tiring day and -1 otherwise. If the prefix score is positive, the whole prefix qualifies. Otherwise, the best start is the first index where the score was `score - 1`, because scores change by 1 per step.
+
+```python
+def longest_wpi(hours: list[int]) -> int:
+    score = best = 0
+    first: dict[int, int] = {}
+    for i, h in enumerate(hours):
+        score += 1 if h > 8 else -1
+        if score > 0:
+            best = i + 1
+        else:
+            first.setdefault(score, i)
+            if score - 1 in first:
+                best = max(best, i - first[score - 1])
+    return best
+
+
+assert longest_wpi([9, 9, 6, 0, 6, 6, 9]) == 3
+assert longest_wpi([6, 6, 6]) == 0
+assert longest_wpi([9, 6, 9]) == 3
+```
+
+Complexity: O(n).
+F:
+- Why is `score - 1` enough, instead of any smaller score?
+
+@@ Shortest Subarray with Sum at Least K | Hard | Monotonic deque on prefix sums
+Q: Return the length of the shortest non-empty subarray with sum ≥ `k`. Values may be negative. Return -1 if none exists.
+
+Example: `[2,-1,2], k = 3` → `3`
+A:
+Approach: over the prefix sums, keep a deque of indices with increasing prefix values.
+- While the current prefix minus the front's prefix is ≥ k, record the length and pop the front, since a later end can't make it shorter.
+- Pop from the back any prefix ≥ the current one, because the current index is a better start (smaller value, later position).
+
+```python
+from collections import deque
+from itertools import accumulate
+
+
+def shortest_subarray(nums: list[int], k: int) -> int:
+    prefix = [0, *accumulate(nums)]
+    dq: deque[int] = deque()
+    best = len(nums) + 1
+    for i, p in enumerate(prefix):
+        while dq and p - prefix[dq[0]] >= k:
+            best = min(best, i - dq.popleft())
+        while dq and prefix[dq[-1]] >= p:
+            dq.pop()
+        dq.append(i)
+    return best if best <= len(nums) else -1
+
+
+assert shortest_subarray([1], 1) == 1
+assert shortest_subarray([1, 2], 4) == -1
+assert shortest_subarray([2, -1, 2], 3) == 3
+assert shortest_subarray([84, -37, 32, 40, 95], 167) == 3
+```
+
+Complexity: O(n).
+F:
+- Why does the positive-only sliding window fail here?
+
+@@ Product of the Last K Numbers | Medium | Prefix products
+Q: Design `add(num)` and `get_product(k)`, which returns the product of the last k numbers. Values are non-negative.
+A:
+Approach: keep prefix products and reset them on a zero. If k reaches back past the last zero, the product is 0.
+
+```python
+class ProductOfNumbers:
+    def __init__(self) -> None:
+        self._prefix = [1]
+
+    def add(self, num: int) -> None:
+        if num == 0:
+            self._prefix = [1]
+        else:
+            self._prefix.append(self._prefix[-1] * num)
+
+    def get_product(self, k: int) -> int:
+        if k >= len(self._prefix):
+            return 0
+        return self._prefix[-1] // self._prefix[-1 - k]
+
+
+p = ProductOfNumbers()
+for n in (3, 0, 2, 5, 4):
+    p.add(n)
+assert p.get_product(2) == 20
+assert p.get_product(3) == 40
+assert p.get_product(4) == 0
+p.add(8)
+assert p.get_product(2) == 32
+```
+
+Complexity: O(1) per operation. Python integers don't overflow, but in other languages the prefix product can.
+F:
+- Handle overflow in Java (log-sum, or a segment tree of products modulo p).
+
+@@ Minimum Penalty for a Shop | Medium | Prefix scan
+Q: `customers[i]` is `Y` if customers come at hour i and `N` otherwise. Closing at hour j costs one penalty for each `N` before j and each `Y` at or after j. Return the earliest hour with minimum penalty.
+
+Example: `"YYNY"` → `2`
+A:
+Approach: start with closing at hour 0 (penalty = the number of Y). Moving the closing time past hour i lowers the penalty by 1 for a Y and raises it by 1 for an N.
+
+```python
+def best_closing_time(customers: str) -> int:
+    penalty = customers.count("Y")
+    best, hour = penalty, 0
+    for i, ch in enumerate(customers):
+        penalty += -1 if ch == "Y" else 1
+        if penalty < best:
+            best, hour = penalty, i + 1
+    return hour
+
+
+assert best_closing_time("YYNY") == 2
+assert best_closing_time("NNNNN") == 0
+assert best_closing_time("YYYY") == 4
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Choose the best maintenance window for a service from hourly traffic.
+
+@@ Range Addition | Medium | Difference array
+Q: Start with an array of `length` zeros. Each update `[start, end, inc]` adds `inc` to every index in the range. Return the final array.
+
+Example: `length 5, [[1,3,2],[2,4,3],[0,2,-2]]` → `[-2,0,3,5,3]`
+A:
+```python
+from itertools import accumulate
+
+
+def get_modified_array(length: int, updates: list[list[int]]) -> list[int]:
+    diff = [0] * (length + 1)
+    for start, end, inc in updates:
+        diff[start] += inc
+        diff[end + 1] -= inc
+    return list(accumulate(diff[:length]))
+
+
+assert get_modified_array(5, [[1, 3, 2], [2, 4, 3], [0, 2, -2]]) == [-2, 0, 3, 5, 3]
+assert get_modified_array(3, []) == [0, 0, 0]
+```
+
+Complexity: O(n + u) versus O(n·u) for the naive approach.
+F:
+- Interleave updates and queries (Fenwick tree with range update and point query).
+
+@@ Plates Between Candles | Medium | Prefix sums with nearest markers
+Q: `s` consists of `*` (plates) and `|` (candles). For each query `[l, r]`, count the plates that lie between two candles inside `s[l..r]`.
+
+Example: `"**|**|***|", [[2,5],[5,9]]` → `[2,3]`
+A:
+Approach: precompute the plate prefix counts, the nearest candle at or after each index, and the nearest candle at or before each index. Each query is then O(1).
+
+```python
+def plates_between_candles(s: str, queries: list[list[int]]) -> list[int]:
+    n = len(s)
+    plates = [0] * (n + 1)
+    for i, ch in enumerate(s):
+        plates[i + 1] = plates[i] + (ch == "*")
+    prev_candle, last = [-1] * n, -1
+    for i in range(n):
+        if s[i] == "|":
+            last = i
+        prev_candle[i] = last
+    next_candle, last = [n] * n, n
+    for i in range(n - 1, -1, -1):
+        if s[i] == "|":
+            last = i
+        next_candle[i] = last
+    out = []
+    for l, r in queries:
+        a, b = next_candle[l], prev_candle[r]
+        out.append(plates[b] - plates[a] if a < b else 0)
+    return out
+
+
+assert plates_between_candles("**|**|***|", [[2, 5], [5, 9]]) == [2, 3]
+assert plates_between_candles("***|**|*****|**||**|*",
+                              [[1, 17], [4, 5], [14, 17], [5, 11], [15, 16]]) == [9, 0, 0, 0, 0]
+```
+
+Complexity: O(n + q).
+F:
+- Solve with binary search over the candle positions instead of the two arrays.
+
+@@ XOR Queries of a Subarray | Medium | Prefix XOR
+Q: For each query `[l, r]`, return `arr[l] ^ ... ^ arr[r]`.
+
+Example: `[1,3,4,8], [[0,1],[1,2],[0,3],[3,3]]` → `[2,7,14,8]`
+A:
+Approach: XOR is its own inverse, so `xor(l..r) = P[r+1] ^ P[l]`.
+
+```python
+from itertools import accumulate
+from operator import xor
+
+
+def xor_queries(arr: list[int], queries: list[list[int]]) -> list[int]:
+    p = [0, *accumulate(arr, xor)]
+    return [p[r + 1] ^ p[l] for l, r in queries]
+
+
+assert xor_queries([1, 3, 4, 8], [[0, 1], [1, 2], [0, 3], [3, 3]]) == [2, 7, 14, 8]
+assert xor_queries([4, 8, 2, 10], [[2, 3], [1, 3], [0, 0], [0, 3]]) == [8, 0, 4, 4]
+```
+
+Complexity: O(n + q).
+F:
+- Which operations support prefix-difference queries? (Invertible ones: +, ^. Not max or min.)
+
+@@ Merge Intervals | Medium | Intervals
+Q: Merge all overlapping intervals.
+
+Example: `[[1,3],[2,6],[8,10],[15,18]]` → `[[1,6],[8,10],[15,18]]`
+A:
+Seen in: JPMorgan-tagged list (frequent).
+
+Approach: sort by start. If the next interval starts before or at the current end, extend the end. Otherwise start a new interval.
+
+```python
+def merge_intervals(intervals: list[list[int]]) -> list[list[int]]:
+    merged: list[list[int]] = []
+    for start, end in sorted(intervals):
+        if merged and start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return merged
+
+
+assert merge_intervals([[1, 3], [2, 6], [8, 10], [15, 18]]) == [[1, 6], [8, 10], [15, 18]]
+assert merge_intervals([[1, 4], [4, 5]]) == [[1, 5]]
+assert merge_intervals([[1, 4], [2, 3]]) == [[1, 4]]
+assert merge_intervals([]) == []
+```
+
+Complexity: O(n log n) time, O(n) output.
+
+Watch for: `max` on the end (contained intervals), and whether touching intervals count as overlapping (clarify with the interviewer).
+F:
+- Intervals arrive as a stream (Data Stream as Disjoint Intervals).
+- Merge per-user login sessions from logs.
+
+@@ Insert Interval | Medium | Intervals
+Q: Insert `new` into a sorted, non-overlapping interval list, merging where necessary.
+
+Example: `[[1,2],[3,5],[6,7],[8,10],[12,16]], [4,8]` → `[[1,2],[3,10],[12,16]]`
+A:
+Approach: three phases in a single pass: copy the intervals that end before `new`, merge everything that overlaps it, then copy the rest.
+
+```python
+def insert_interval(intervals: list[list[int]], new: list[int]) -> list[list[int]]:
+    out, i, n = [], 0, len(intervals)
+    start, end = new
+    while i < n and intervals[i][1] < start:
+        out.append(intervals[i])
+        i += 1
+    while i < n and intervals[i][0] <= end:
+        start = min(start, intervals[i][0])
+        end = max(end, intervals[i][1])
+        i += 1
+    out.append([start, end])
+    out.extend(intervals[i:])
+    return out
+
+
+assert insert_interval([[1, 3], [6, 9]], [2, 5]) == [[1, 5], [6, 9]]
+assert insert_interval([[1, 2], [3, 5], [6, 7], [8, 10], [12, 16]], [4, 8]) == [[1, 2], [3, 10], [12, 16]]
+assert insert_interval([], [5, 7]) == [[5, 7]]
+assert insert_interval([[1, 5]], [6, 8]) == [[1, 5], [6, 8]]
+```
+
+Complexity: O(n). Binary search can find the boundaries, but copying is still O(n).
+F:
+- Remove an interval from the set.
+
+@@ Non-overlapping Intervals | Medium | Greedy by end
+Q: Return the minimum number of intervals to remove so the rest don't overlap. Touching intervals are fine.
+
+Example: `[[1,2],[2,3],[3,4],[1,3]]` → `1`
+A:
+Approach: this is activity selection. Sort by end and keep every interval that starts at or after the last kept end. The number removed is n minus the number kept.
+
+```python
+def erase_overlap_intervals(intervals: list[list[int]]) -> int:
+    kept, last_end = 0, float("-inf")
+    for start, end in sorted(intervals, key=lambda iv: iv[1]):
+        if start >= last_end:
+            kept += 1
+            last_end = end
+    return len(intervals) - kept
+
+
+assert erase_overlap_intervals([[1, 2], [2, 3], [3, 4], [1, 3]]) == 1
+assert erase_overlap_intervals([[1, 2], [1, 2], [1, 2]]) == 2
+assert erase_overlap_intervals([[1, 2], [2, 3]]) == 0
+```
+
+Complexity: O(n log n).
+
+Why sort by end: the interval that finishes earliest leaves the most room for the others (exchange argument).
+F:
+- Weighted version: maximise the total value (DP plus binary search).
+
+@@ Meeting Rooms | Easy | Intervals
+Q: Can one person attend all the meetings, given as half-open intervals?
+
+Example: `[[0,30],[5,10],[15,20]]` → `False`
+A:
+```python
+def can_attend_meetings(intervals: list[list[int]]) -> bool:
+    ordered = sorted(intervals)
+    return all(prev[1] <= cur[0] for prev, cur in zip(ordered, ordered[1:]))
+
+
+assert not can_attend_meetings([[0, 30], [5, 10], [15, 20]])
+assert can_attend_meetings([[7, 10], [2, 4]])
+assert can_attend_meetings([[1, 5], [5, 6]])
+assert can_attend_meetings([])
+```
+
+Complexity: O(n log n).
+F:
+- Return the conflicting pairs.
+
+@@ Meeting Rooms II | Medium | Heap or sweep
+Q: Return the minimum number of rooms needed to hold all the meetings (half-open intervals).
+
+Example: `[[0,30],[5,10],[15,20]]` → `2`
+A:
+Seen in: JPMorgan-tagged list (high frequency). It also shows up as "Maximum Number of Overlapping Intervals" in reported coding rounds.
+
+Approach: sort by start and keep a min-heap of end times. Reuse the room that frees up first if it's free by the new start. The heap size at the end is the answer.
+
+```python
+import heapq
+
+
+def min_meeting_rooms(intervals: list[list[int]]) -> int:
+    ends: list[int] = []
+    for start, end in sorted(intervals):
+        if ends and ends[0] <= start:
+            heapq.heapreplace(ends, end)
+        else:
+            heapq.heappush(ends, end)
+    return len(ends)
+
+
+def min_meeting_rooms_sweep(intervals: list[list[int]]) -> int:
+    starts = sorted(s for s, _ in intervals)
+    ends = sorted(e for _, e in intervals)
+    rooms = best = j = 0
+    for s in starts:
+        while ends[j] <= s:
+            j += 1
+            rooms -= 1
+        rooms += 1
+        best = max(best, rooms)
+    return best
+
+
+for f in (min_meeting_rooms, min_meeting_rooms_sweep):
+    assert f([[0, 30], [5, 10], [15, 20]]) == 2
+    assert f([[7, 10], [2, 4]]) == 1
+    assert f([[1, 5], [5, 10]]) == 1
+    assert f([[1, 10], [2, 7], [3, 19], [8, 12], [10, 20], [11, 30]]) == 4
+```
+
+Complexity: O(n log n) for both.
+F:
+- Also return which room each meeting gets.
+- The same idea sizes a worker pool from job start and end logs.
+
+@@ Minimum Number of Arrows to Burst Balloons | Medium | Greedy by end
+Q: Balloons are closed intervals on the x-axis. An arrow at x bursts every balloon with `start ≤ x ≤ end`. Return the minimum number of arrows.
+
+Example: `[[10,16],[2,8],[1,6],[7,12]]` → `2`
+A:
+Approach: sort by end and shoot at the end of the first unburst balloon, which bursts everything that overlaps it. Closed intervals mean touching balloons share an arrow.
+
+```python
+def find_min_arrow_shots(points: list[list[int]]) -> int:
+    arrows, last = 0, float("-inf")
+    for start, end in sorted(points, key=lambda p: p[1]):
+        if start > last:
+            arrows += 1
+            last = end
+    return arrows
+
+
+assert find_min_arrow_shots([[10, 16], [2, 8], [1, 6], [7, 12]]) == 2
+assert find_min_arrow_shots([[1, 2], [3, 4], [5, 6], [7, 8]]) == 4
+assert find_min_arrow_shots([[1, 2], [2, 3], [3, 4], [4, 5]]) == 2
+```
+
+Complexity: O(n log n).
+F:
+- How does this relate to Non-overlapping Intervals? (Arrows = maximum number of pairwise-disjoint intervals.)
+
+@@ Interval List Intersections | Medium | Two pointers
+Q: Given two sorted lists of disjoint closed intervals, return their intersection.
+
+Example: `A=[[0,2],[5,10],[13,23],[24,25]], B=[[1,5],[8,12],[15,24],[25,26]]` → `[[1,2],[5,5],[8,10],[15,23],[24,24],[25,25]]`
+A:
+Approach: two pointers. The overlap is `[max(starts), min(ends)]` when it's non-empty. Advance whichever interval ends first.
+
+```python
+def interval_intersection(a: list[list[int]], b: list[list[int]]) -> list[list[int]]:
+    i = j = 0
+    out = []
+    while i < len(a) and j < len(b):
+        lo = max(a[i][0], b[j][0])
+        hi = min(a[i][1], b[j][1])
+        if lo <= hi:
+            out.append([lo, hi])
+        if a[i][1] < b[j][1]:
+            i += 1
+        else:
+            j += 1
+    return out
+
+
+A = [[0, 2], [5, 10], [13, 23], [24, 25]]
+B = [[1, 5], [8, 12], [15, 24], [25, 26]]
+assert interval_intersection(A, B) == [[1, 2], [5, 5], [8, 10], [15, 23], [24, 24], [25, 25]]
+assert interval_intersection([], B) == []
+```
+
+Complexity: O(n + m).
+F:
+- Find the common free time of two calendars.
+
+@@ Employee Free Time | Hard | Merge intervals
+Q: Each employee has a sorted list of busy intervals. Return the finite intervals when everyone is free.
+
+Example: `[[[1,2],[5,6]],[[1,3]],[[4,10]]]` → `[[3,4]]`
+A:
+Approach: flatten all the intervals, sort, and merge. The gaps between merged intervals are the common free time. A heap-based k-way merge avoids a full sort, giving O(n log k).
+
+```python
+def employee_free_time(schedule: list[list[list[int]]]) -> list[list[int]]:
+    busy = sorted(iv for person in schedule for iv in person)
+    free, end = [], None
+    for s, e in busy:
+        if end is not None and s > end:
+            free.append([end, s])
+        end = e if end is None else max(end, e)
+    return free
+
+
+assert employee_free_time([[[1, 2], [5, 6]], [[1, 3]], [[4, 10]]]) == [[3, 4]]
+assert employee_free_time([[[1, 3], [6, 7]], [[2, 4]], [[2, 5], [9, 12]]]) == [[5, 6], [7, 9]]
+assert employee_free_time([[[1, 2]]]) == []
+```
+
+Complexity: O(n log n), or O(n log k) with `heapq.merge`.
+F:
+- Find the first free slot of at least 30 minutes within working hours, across time zones.
+
+@@ Two Best Non-Overlapping Events | Medium | Sort, suffix max, binary search
+Q: `events[i] = [start, end, value]` with inclusive times. Choose at most two non-overlapping events (the second must start after the first ends) to maximise the total value.
+
+Example: `[[1,3,2],[4,5,2],[2,4,3]]` → `4`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: sort by start and build a suffix maximum of values. For each event, binary-search the first event whose start is greater than its end, and combine the two values.
+
+```python
+from bisect import bisect_right
+
+
+def max_two_events(events: list[list[int]]) -> int:
+    ev = sorted(events)
+    starts = [e[0] for e in ev]
+    suffix = [0] * (len(ev) + 1)
+    for i in range(len(ev) - 1, -1, -1):
+        suffix[i] = max(suffix[i + 1], ev[i][2])
+    best = 0
+    for _, end, value in ev:
+        j = bisect_right(starts, end)
+        best = max(best, value + suffix[j])
+    return best
+
+
+assert max_two_events([[1, 3, 2], [4, 5, 2], [2, 4, 3]]) == 4
+assert max_two_events([[1, 3, 2], [4, 5, 2], [1, 5, 5]]) == 5
+assert max_two_events([[1, 5, 3], [1, 5, 1], [6, 6, 5]]) == 8
+```
+
+Complexity: O(n log n).
+F:
+- At most k events (DP over the sorted events with binary search, O(nk log n)).
+
+@@ Maximum Concurrent Sessions | Medium | Sweep line
+Q: Given half-open sessions `[start, end)`, return the peak number of concurrent sessions and the earliest time it occurs.
+
+Example: `[[1,5],[2,6],[4,8],[7,9]]` → `(3, 4)`
+A:
+Seen in: reported JPMorganChase online assessment problems that are variants of "maximum number of overlapping intervals".
+
+Approach: create +1 and -1 events and sort them by `(time, delta)`. Ends (-1) come before starts (+1) at the same time, which matches half-open semantics.
+
+```python
+def max_concurrent(sessions: list[list[int]]) -> tuple[int, int | None]:
+    events = sorted([(s, 1) for s, _ in sessions] + [(e, -1) for _, e in sessions])
+    live = best = 0
+    at = None
+    for t, delta in events:
+        live += delta
+        if live > best:
+            best, at = live, t
+    return best, at
+
+
+assert max_concurrent([[1, 5], [2, 6], [4, 8], [7, 9]]) == (3, 4)
+assert max_concurrent([[1, 2], [2, 3]]) == (1, 1)
+assert max_concurrent([]) == (0, None)
+```
+
+Complexity: O(n log n).
+F:
+- Closed intervals (put starts before ends at the same time).
+- Distributed version across many servers' logs (map to per-minute deltas, then reduce).
+
+@@ My Calendar I | Medium | Sorted intervals with bisect
+Q: Implement `book(start, end)` for half-open intervals. Return `True` and store the booking if it doesn't overlap any existing booking, otherwise return `False`.
+A:
+Approach: keep bookings sorted. Binary-search the insertion point and check only the two neighbours.
+
+```python
+from bisect import bisect_left
+
+
+class MyCalendar:
+    def __init__(self) -> None:
+        self._bookings: list[tuple[int, int]] = []
+
+    def book(self, start: int, end: int) -> bool:
+        b = self._bookings
+        i = bisect_left(b, (start, end))
+        if i > 0 and b[i - 1][1] > start:
+            return False
+        if i < len(b) and b[i][0] < end:
+            return False
+        b.insert(i, (start, end))
+        return True
+
+
+cal = MyCalendar()
+assert cal.book(10, 20) is True
+assert cal.book(15, 25) is False
+assert cal.book(20, 30) is True
+assert cal.book(5, 10) is True
+assert cal.book(9, 11) is False
+```
+
+Complexity: O(log n) to search, O(n) to insert into a list. A balanced BST or `sortedcontainers.SortedList` gives O(log n) overall.
+F:
+- Make it thread-safe for a booking API (a lock, or an optimistic database constraint with an exclusion constraint in Postgres).
+
+@@ My Calendar II | Medium | Overlap tracking
+Q: `book` succeeds unless it would create a triple booking.
+A:
+Approach: store the single bookings and the double-booked overlaps separately. A new booking fails if it intersects any overlap. Otherwise, record its intersections with the single bookings as new overlaps.
+
+```python
+class MyCalendarTwo:
+    def __init__(self) -> None:
+        self._bookings: list[tuple[int, int]] = []
+        self._overlaps: list[tuple[int, int]] = []
+
+    def book(self, start: int, end: int) -> bool:
+        if any(start < b and a < end for a, b in self._overlaps):
+            return False
+        for a, b in self._bookings:
+            if start < b and a < end:
+                self._overlaps.append((max(a, start), min(b, end)))
+        self._bookings.append((start, end))
+        return True
+
+
+cal = MyCalendarTwo()
+results = [cal.book(*iv) for iv in [(10, 20), (50, 60), (10, 40), (5, 15), (5, 10), (25, 55)]]
+assert results == [True, True, True, False, True, True]
+```
+
+Complexity: O(n) per booking. The general k-booking version uses a sweep over a sorted map of deltas.
+F:
+- My Calendar III: return the maximum k-booking after each call.
+
+@@ Remove Covered Intervals | Medium | Sorting
+Q: Remove every interval covered by another (`c ≤ a` and `b ≤ d`). Return the number that remain.
+
+Example: `[[1,4],[3,6],[2,8]]` → `2`
+A:
+Approach: sort by start ascending, then end descending, so that a covering interval comes before the intervals it covers. Keep an interval only if its end exceeds the maximum end seen so far.
+
+```python
+def remove_covered_intervals(intervals: list[list[int]]) -> int:
+    kept, max_end = 0, float("-inf")
+    for _, end in sorted(intervals, key=lambda iv: (iv[0], -iv[1])):
+        if end > max_end:
+            kept += 1
+            max_end = end
+    return kept
+
+
+assert remove_covered_intervals([[1, 4], [3, 6], [2, 8]]) == 2
+assert remove_covered_intervals([[1, 4], [2, 3]]) == 1
+assert remove_covered_intervals([[1, 2], [1, 4], [3, 4]]) == 1
+```
+
+Complexity: O(n log n).
+F:
+- Why sort the ends descending when the starts tie?
+
+@@ Summary Ranges | Easy | Array scan
+Q: Summarise a sorted list of unique integers as ranges.
+
+Example: `[0,1,2,4,5,7]` → `["0->2","4->5","7"]`
+A:
+```python
+def summary_ranges(nums: list[int]) -> list[str]:
+    out, i = [], 0
+    while i < len(nums):
+        j = i
+        while j + 1 < len(nums) and nums[j + 1] == nums[j] + 1:
+            j += 1
+        out.append(str(nums[i]) if i == j else f"{nums[i]}->{nums[j]}")
+        i = j + 1
+    return out
+
+
+assert summary_ranges([0, 1, 2, 4, 5, 7]) == ["0->2", "4->5", "7"]
+assert summary_ranges([0, 2, 3, 4, 6, 8, 9]) == ["0", "2->4", "6", "8->9"]
+assert summary_ranges([]) == []
+```
+
+Complexity: O(n).
+F:
+- Compress a list of cheque numbers for a statement ("1001-1005, 1008").
+
+@@ Missing Ranges | Easy | Array scan
+Q: Given sorted unique `nums` within `[lower, upper]`, return the missing ranges as `[start, end]` pairs.
+
+Example: `[0,1,3,50,75], 0, 99` → `[[2,2],[4,49],[51,74],[76,99]]`
+A:
+Approach: use sentinels `lower - 1` and `upper + 1`, then emit every gap of at least 2 between consecutive values.
+
+```python
+def find_missing_ranges(nums: list[int], lower: int, upper: int) -> list[list[int]]:
+    out, prev = [], lower - 1
+    for x in [*nums, upper + 1]:
+        if x - prev >= 2:
+            out.append([prev + 1, x - 1])
+        prev = x
+    return out
+
+
+assert find_missing_ranges([0, 1, 3, 50, 75], 0, 99) == [[2, 2], [4, 49], [51, 74], [76, 99]]
+assert find_missing_ranges([-1], -1, -1) == []
+assert find_missing_ranges([], 1, 1) == [[1, 1]]
+```
+
+Complexity: O(n).
+F:
+- Find gaps in a sequence of message offsets (detect lost Kafka messages per partition).
+
+@@ Data Stream as Disjoint Intervals | Hard | Sorted intervals
+Q: Design `add_num(v)` and `get_intervals()`, which returns the numbers seen so far as a sorted list of disjoint intervals.
+A:
+Approach: keep a sorted list of `[start, end]`. On insertion, binary-search the position, skip if `v` is already covered, and otherwise merge with the left neighbour, the right neighbour, both, or neither.
+
+```python
+from bisect import bisect_left
+
+
+class SummaryRanges:
+    def __init__(self) -> None:
+        self._iv: list[list[int]] = []
+
+    def add_num(self, v: int) -> None:
+        iv = self._iv
+        i = bisect_left(iv, [v, v])
+        if i < len(iv) and iv[i][0] == v:
+            return
+        if i > 0 and iv[i - 1][1] >= v:
+            return
+        joins_left = i > 0 and iv[i - 1][1] == v - 1
+        joins_right = i < len(iv) and iv[i][0] == v + 1
+        if joins_left and joins_right:
+            iv[i - 1][1] = iv[i][1]
+            iv.pop(i)
+        elif joins_left:
+            iv[i - 1][1] = v
+        elif joins_right:
+            iv[i][0] = v
+        else:
+            iv.insert(i, [v, v])
+
+    def get_intervals(self) -> list[list[int]]:
+        return [list(x) for x in self._iv]
+
+
+sr = SummaryRanges()
+snapshots = []
+for v in (1, 3, 7, 2, 6, 2):
+    sr.add_num(v)
+    snapshots.append(sr.get_intervals())
+assert snapshots[0] == [[1, 1]]
+assert snapshots[3] == [[1, 3], [7, 7]]
+assert snapshots[4] == [[1, 3], [6, 7]]
+assert snapshots[5] == [[1, 3], [6, 7]]
+```
+
+Complexity: O(log n) search plus O(n) list insertion. A balanced tree (`SortedList`) gives O(log n).
+F:
+- Many adds and few gets? (Store a set and build the intervals lazily.)
+
+@@ Maximum Number of Events That Can Be Attended | Medium | Greedy with heap
+Q: `events[i] = [start, end]` (inclusive days). You can attend one event per day. Return the maximum number of events you can attend.
+
+Example: `[[1,2],[2,3],[3,4],[1,2]]` → `4`
+A:
+Approach: sweep the days. Push the end days of events that have started into a min-heap, then attend the one that ends soonest. Drop expired events.
+
+```python
+import heapq
+
+
+def max_events(events: list[list[int]]) -> int:
+    ev = sorted(events)
+    heap: list[int] = []
+    i, day, attended, n = 0, 0, 0, len(ev)
+    while i < n or heap:
+        if not heap:
+            day = max(day, ev[i][0])
+        while i < n and ev[i][0] <= day:
+            heapq.heappush(heap, ev[i][1])
+            i += 1
+        heapq.heappop(heap)
+        attended += 1
+        day += 1
+        while heap and heap[0] < day:
+            heapq.heappop(heap)
+    return attended
+
+
+assert max_events([[1, 2], [2, 3], [3, 4]]) == 3
+assert max_events([[1, 2], [2, 3], [3, 4], [1, 2]]) == 4
+assert max_events([[1, 4], [4, 4], [2, 2], [3, 4], [1, 1]]) == 4
+```
+
+Complexity: O(n log n).
+F:
+- Why is "earliest deadline first" optimal here?
+
+@@ Sort an Array | Medium | Merge sort
+Q: Sort an integer array in O(n log n) without built-in sort functions.
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: merge sort is stable, guarantees O(n log n) and is easy to get right. Quicksort is in-place, but its worst case is O(n²) unless the pivot is randomised.
+
+```python
+import random
+
+
+def merge_sort(nums: list[int]) -> list[int]:
+    if len(nums) <= 1:
+        return list(nums)
+    mid = len(nums) // 2
+    left, right = merge_sort(nums[:mid]), merge_sort(nums[mid:])
+    out, i, j = [], 0, 0
+    while i < len(left) and j < len(right):
+        if left[i] <= right[j]:
+            out.append(left[i])
+            i += 1
+        else:
+            out.append(right[j])
+            j += 1
+    out.extend(left[i:])
+    out.extend(right[j:])
+    return out
+
+
+rng = random.Random(0)
+for _ in range(100):
+    data = [rng.randint(-50, 50) for _ in range(rng.randint(0, 40))]
+    assert merge_sort(data) == sorted(data)
+```
+
+Complexity: O(n log n) time, O(n) space.
+
+`<=` in the merge keeps it stable. Python's `sorted` is Timsort, which is stable and adaptive (O(n) on nearly sorted input).
+F:
+- Why is stability important when sorting records by several keys?
+- Implement iterative bottom-up merge sort.
+
+@@ Kth Largest Element in an Array | Medium | Quickselect
+Q: Return the k-th largest element without fully sorting.
+
+Example: `[3,2,1,5,6,4], k = 2` → `5`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: quickselect with a random pivot and a 3-way partition, which also handles duplicates. The expected cost is O(n). The alternative is a size-k min-heap in O(n log k), which is predictable and works on streams.
+
+```python
+import heapq
+import random
+
+
+def find_kth_largest(nums: list[int], k: int, rng: random.Random = random.Random(0)) -> int:
+    a = list(nums)
+    target = len(a) - k
+    lo, hi = 0, len(a) - 1
+    while True:
+        pivot = a[rng.randint(lo, hi)]
+        lt, i, gt = lo, lo, hi
+        while i <= gt:
+            if a[i] < pivot:
+                a[lt], a[i] = a[i], a[lt]
+                lt += 1
+                i += 1
+            elif a[i] > pivot:
+                a[i], a[gt] = a[gt], a[i]
+                gt -= 1
+            else:
+                i += 1
+        if target < lt:
+            hi = lt - 1
+        elif target > gt:
+            lo = gt + 1
+        else:
+            return pivot
+
+
+def find_kth_largest_heap(nums: list[int], k: int) -> int:
+    return heapq.nlargest(k, nums)[-1]
+
+
+for f in (find_kth_largest, find_kth_largest_heap):
+    assert f([3, 2, 1, 5, 6, 4], 2) == 5
+    assert f([3, 2, 3, 1, 2, 4, 5, 5, 6], 4) == 4
+    assert f([1], 1) == 1
+```
+
+Complexity: quickselect is O(n) expected and O(n²) worst case. Median-of-medians guarantees O(n).
+F:
+- Which one would you use on a stream? (The heap.)
+- Top-k tokens by log-probability. Which approach, and why?
+
+@@ Largest Number | Medium | Custom comparator
+Q: Arrange non-negative integers so they form the largest possible number. Return it as a string.
+
+Example: `[3,30,34,5,9]` → `"9534330"`
+A:
+Approach: `a` should come before `b` if `a+b > b+a` as strings. Sort with `functools.cmp_to_key`. If the result starts with `"0"`, all the values are zero.
+
+```python
+from functools import cmp_to_key
+
+
+def largest_number(nums: list[int]) -> str:
+    strs = [str(n) for n in nums]
+    strs.sort(key=cmp_to_key(lambda a, b: (b + a > a + b) - (a + b > b + a)))
+    result = "".join(strs)
+    return "0" if result[0] == "0" else result
+
+
+assert largest_number([10, 2]) == "210"
+assert largest_number([3, 30, 34, 5, 9]) == "9534330"
+assert largest_number([0, 0]) == "0"
+```
+
+Complexity: O(n log n · L) for number length L.
+F:
+- Prove that the comparator is transitive.
+- The smallest number instead.
+
+@@ Sort Array By Parity | Easy | Two pointers
+Q: Move all even numbers before all odd numbers, in place.
+A:
+```python
+def sort_array_by_parity(nums: list[int]) -> list[int]:
+    i, j = 0, len(nums) - 1
+    while i < j:
+        if nums[i] % 2 == 0:
+            i += 1
+        elif nums[j] % 2 == 1:
+            j -= 1
+        else:
+            nums[i], nums[j] = nums[j], nums[i]
+    return nums
+
+
+out = sort_array_by_parity([3, 1, 2, 4])
+assert sorted(out) == [1, 2, 3, 4]
+first_odd = next((i for i, x in enumerate(out) if x % 2), len(out))
+assert all(x % 2 == 0 for x in out[:first_odd]) and all(x % 2 for x in out[first_odd:])
+assert sort_array_by_parity([]) == []
+```
+
+Complexity: O(n) time, O(1) space. It is not stable. For a stable version, use `sorted(nums, key=lambda x: x % 2)`.
+F:
+- Sort Array By Parity II: evens at even indices and odds at odd indices.
+
+@@ Relative Sort Array | Easy | Custom sort key
+Q: Sort `arr1` so its elements follow the order of `arr2`. Elements not in `arr2` go at the end in ascending order.
+
+Example: `[2,3,1,3,2,4,6,7,9,2,19], [2,1,4,3,9,6]` → `[2,2,2,1,4,3,3,9,6,7,19]`
+A:
+```python
+def relative_sort_array(arr1: list[int], arr2: list[int]) -> list[int]:
+    rank = {v: i for i, v in enumerate(arr2)}
+    return sorted(arr1, key=lambda x: (rank.get(x, len(arr2)), x))
+
+
+assert relative_sort_array([2, 3, 1, 3, 2, 4, 6, 7, 9, 2, 19], [2, 1, 4, 3, 9, 6]) == [
+    2, 2, 2, 1, 4, 3, 3, 9, 6, 7, 19]
+assert relative_sort_array([28, 6, 22, 8, 44, 17], [22, 28, 8, 6]) == [22, 28, 8, 6, 17, 44]
+```
+
+Complexity: O(n log n). Counting sort gives O(n + range) for bounded values.
+F:
+- Sort support tickets by a business priority list, then by age.
+
+@@ Minimum Platforms Required | Medium | Sweep with two sorted arrays
+Q: Given the arrival and departure times of trains at a station, return the minimum number of platforms so no train waits. A train arriving at the same minute another departs needs a separate platform.
+
+Example: `arr=[900,940,950,1100,1500,1800], dep=[910,1200,1120,1130,1900,2000]` → `3`
+A:
+Approach: sort both lists and merge them with two pointers. An arrival at or before the next departure needs a new platform (inclusive semantics).
+
+```python
+def min_platforms(arrivals: list[int], departures: list[int]) -> int:
+    a, d = sorted(arrivals), sorted(departures)
+    i = j = platforms = best = 0
+    while i < len(a):
+        if a[i] <= d[j]:
+            platforms += 1
+            best = max(best, platforms)
+            i += 1
+        else:
+            platforms -= 1
+            j += 1
+    return best
+
+
+assert min_platforms([900, 940, 950, 1100, 1500, 1800], [910, 1200, 1120, 1130, 1900, 2000]) == 3
+assert min_platforms([900, 1100, 1235], [1000, 1200, 1240]) == 1
+assert min_platforms([100, 100], [200, 200]) == 2
+```
+
+Complexity: O(n log n).
+F:
+- How does this differ from Meeting Rooms II? (Inclusive versus half-open semantics.)
+
+@@ H-Index | Medium | Counting sort
+Q: The h-index is the largest h such that the researcher has at least h papers with at least h citations each. Compute it.
+
+Example: `[3,0,6,1,5]` → `3`
+A:
+Approach: bucket by citation count, capped at n, then walk down from n accumulating papers until the count reaches h. This is O(n) and avoids an O(n log n) sort.
+
+```python
+def h_index(citations: list[int]) -> int:
+    n = len(citations)
+    buckets = [0] * (n + 1)
+    for c in citations:
+        buckets[min(c, n)] += 1
+    total = 0
+    for h in range(n, -1, -1):
+        total += buckets[h]
+        if total >= h:
+            return h
+    return 0
+
+
+assert h_index([3, 0, 6, 1, 5]) == 3
+assert h_index([1, 3, 1]) == 1
+assert h_index([0]) == 0
+assert h_index([100]) == 1
+```
+
+Complexity: O(n) time and space.
+F:
+- H-Index II: the input is sorted, so binary search in O(log n).
+
+@@ Count Inversions in an Array | Hard | Merge sort
+Q: Count the pairs `i < j` with `a[i] > a[j]`.
+
+Example: `[2,4,1,3,5]` → `3`
+A:
+Approach: augment merge sort. When an element from the right half is placed before the remaining left-half elements, it forms an inversion with each of them.
+
+```python
+import random
+
+
+def count_inversions(a: list[int]) -> int:
+    def sort(xs: list[int]) -> tuple[list[int], int]:
+        if len(xs) <= 1:
+            return xs, 0
+        mid = len(xs) // 2
+        left, x = sort(xs[:mid])
+        right, y = sort(xs[mid:])
+        merged, i, j, inv = [], 0, 0, x + y
+        while i < len(left) and j < len(right):
+            if left[i] <= right[j]:
+                merged.append(left[i])
+                i += 1
+            else:
+                merged.append(right[j])
+                inv += len(left) - i
+                j += 1
+        merged += left[i:] + right[j:]
+        return merged, inv
+
+    return sort(list(a))[1]
+
+
+assert count_inversions([2, 4, 1, 3, 5]) == 3
+assert count_inversions([5, 4, 3, 2, 1]) == 10
+assert count_inversions([]) == 0
+rng = random.Random(3)
+for _ in range(50):
+    xs = [rng.randint(0, 20) for _ in range(30)]
+    brute = sum(xs[i] > xs[j] for i in range(len(xs)) for j in range(i + 1, len(xs)))
+    assert count_inversions(xs) == brute
+```
+
+Complexity: O(n log n). The alternative is a Fenwick tree over compressed values.
+F:
+- Kendall tau distance between two rankings, for example when comparing a reranker's ordering with human labels.
+
+@@ Wiggle Sort | Medium | Greedy swaps
+Q: Reorder in place so that `nums[0] <= nums[1] >= nums[2] <= nums[3] ...`.
+A:
+Approach: one pass. At an odd index you need `nums[i-1] <= nums[i]`, and at an even index `nums[i-1] >= nums[i]`. When the condition fails, swapping the neighbours fixes it without breaking the previous pair.
+
+```python
+def wiggle_sort(nums: list[int]) -> None:
+    for i in range(1, len(nums)):
+        if (i % 2 == 1) != (nums[i - 1] <= nums[i]):
+            nums[i - 1], nums[i] = nums[i], nums[i - 1]
+
+
+def is_wiggle(a: list[int]) -> bool:
+    return all((a[i - 1] <= a[i]) if i % 2 else (a[i - 1] >= a[i]) for i in range(1, len(a)))
+
+
+for case in ([3, 5, 2, 1, 6, 4], [1, 2, 3, 4, 5], [5, 4, 3, 2, 1], [1, 1, 1], []):
+    wiggle_sort(case)
+    assert is_wiggle(case)
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Wiggle Sort II with strict inequalities (median plus 3-way partition with virtual indexing).
+
+@@ Pancake Sorting | Medium | Constructive
+Q: A flip reverses the prefix `arr[:k]`. Return a sequence of flips that sorts the permutation `arr`, using at most 10n flips.
+A:
+Approach: for size from n down to 2, flip the maximum to the front, then flip it into its final place. This uses at most 2n flips.
+
+```python
+def pancake_sort(arr: list[int]) -> list[int]:
+    a, flips = list(arr), []
+    for size in range(len(a), 1, -1):
+        i = a.index(size)
+        if i == size - 1:
+            continue
+        if i != 0:
+            flips.append(i + 1)
+            a[:i + 1] = reversed(a[:i + 1])
+        flips.append(size)
+        a[:size] = reversed(a[:size])
+    return flips
+
+
+def apply(arr: list[int], flips: list[int]) -> list[int]:
+    a = list(arr)
+    for k in flips:
+        a[:k] = reversed(a[:k])
+    return a
+
+
+for case in ([3, 2, 4, 1], [1, 2, 3], [2, 1], [5, 1, 4, 2, 3]):
+    flips = pancake_sort(case)
+    assert apply(case, flips) == sorted(case) and len(flips) <= 2 * len(case)
+```
+
+Complexity: O(n²).
+F:
+- The minimum number of flips is NP-hard. Why is 2n still acceptable here?
+
+@@ Sort Transactions by Multiple Keys | Easy | Sorting with keys
+Q: Sort transaction records by date ascending, then amount descending, then transaction id ascending. Amounts are `Decimal`. Records with a missing date go last.
+A:
+Why it matters here: this is everyday reporting code, and interviewers look for tuple keys, stability and correct handling of money and nulls.
+
+Approach: use one tuple key and negate the amount (safe for `Decimal`). Or use two stable sorts, applying the least significant key first.
+
+```python
+from decimal import Decimal
+
+
+def sort_transactions(txns: list[dict]) -> list[dict]:
+    return sorted(txns, key=lambda t: (t["date"] is None, t["date"] or "", -t["amount"], t["id"]))
+
+
+def sort_transactions_stable(txns: list[dict]) -> list[dict]:
+    out = sorted(txns, key=lambda t: t["id"])
+    out.sort(key=lambda t: t["amount"], reverse=True)
+    out.sort(key=lambda t: (t["date"] is None, t["date"] or ""))
+    return out
+
+
+txns = [
+    {"id": "T3", "date": "2026-09-01", "amount": Decimal("10.00")},
+    {"id": "T1", "date": "2026-09-01", "amount": Decimal("250.50")},
+    {"id": "T2", "date": None, "amount": Decimal("5.00")},
+    {"id": "T0", "date": "2026-08-31", "amount": Decimal("1.00")},
+    {"id": "T4", "date": "2026-09-01", "amount": Decimal("10.00")},
+]
+expected = ["T0", "T1", "T3", "T4", "T2"]
+assert [t["id"] for t in sort_transactions(txns)] == expected
+assert [t["id"] for t in sort_transactions_stable(txns)] == expected
+```
+
+Complexity: O(n log n).
+
+Notes: never use `float` for money. ISO-8601 date strings sort correctly as text. `reverse=True` on a stable sort still keeps equal keys in their original order.
+F:
+- Sort 50 GB of transactions (external merge sort, or push the sort into the database with an index).
+- Why is negating a key not possible for strings, and what do you do instead?
+
+@@ Maximum Gap | Hard | Bucket sort
+Q: Return the maximum difference between successive elements in sorted order, in linear time.
+
+Example: `[3,6,9,1]` → `3`
+A:
+Approach: pigeonhole. With n numbers spanning `hi - lo`, the maximum gap is at least `ceil((hi-lo)/(n-1))`. Use buckets of that width (at least 1). Then the maximum gap never falls inside a bucket, so compare each bucket's minimum with the previous non-empty bucket's maximum.
+
+```python
+import random
+
+
+def maximum_gap(nums: list[int]) -> int:
+    if len(nums) < 2:
+        return 0
+    lo, hi = min(nums), max(nums)
+    if lo == hi:
+        return 0
+    n = len(nums)
+    size = max(1, (hi - lo) // (n - 1))
+    count = (hi - lo) // size + 1
+    bmin = [None] * count
+    bmax = [None] * count
+    for x in nums:
+        b = (x - lo) // size
+        bmin[b] = x if bmin[b] is None else min(bmin[b], x)
+        bmax[b] = x if bmax[b] is None else max(bmax[b], x)
+    best, prev = 0, lo
+    for b in range(count):
+        if bmin[b] is None:
+            continue
+        best = max(best, bmin[b] - prev)
+        prev = bmax[b]
+    return best
+
+
+assert maximum_gap([3, 6, 9, 1]) == 3
+assert maximum_gap([10]) == 0
+assert maximum_gap([1, 10_000_000]) == 9_999_999
+rng = random.Random(5)
+for _ in range(100):
+    xs = [rng.randint(0, 1000) for _ in range(rng.randint(2, 30))]
+    s = sorted(xs)
+    assert maximum_gap(xs) == max(b - a for a, b in zip(s, s[1:]))
+```
+
+Complexity: O(n) time and space. Radix sort is another O(n·d) option.
+F:
+- Why can't the maximum gap lie inside a single bucket?
+
+@@ Reorder Data in Log Files | Medium | Custom sort key
+Q: Each log is `"<id> <content>"`. Letter-logs (content made of words) come before digit-logs. Letter-logs sort by content, then by id. Digit-logs keep their original order.
+A:
+Approach: a tuple key, `(0, content, id)` for letter-logs and `(1,)` for digit-logs. Python's stable sort keeps the digit-logs in their original order.
+
+```python
+def reorder_log_files(logs: list[str]) -> list[str]:
+    def key(log: str) -> tuple:
+        ident, rest = log.split(" ", 1)
+        return (0, rest, ident) if rest[0].isalpha() else (1,)
+
+    return sorted(logs, key=key)
+
+
+logs = ["dig1 8 1 5 1", "let1 art can", "dig2 3 6", "let2 own kit dig", "let3 art zero"]
+assert reorder_log_files(logs) == ["let1 art can", "let3 art zero", "let2 own kit dig", "dig1 8 1 5 1", "dig2 3 6"]
+```
+
+Complexity: O(n log n · L).
+F:
+- Parse and sort structured JSON logs by severity, then timestamp.
+
+@@ Minimum Number of Moves to Seat Everyone | Easy | Sorting and pairing
+Q: Each move shifts one student by 1 seat. Return the minimum number of moves to seat every student, one per seat.
+
+Example: `seats=[3,1,5], students=[2,7,4]` → `4`
+A:
+Approach: sort both lists and pair them in order. Matching the i-th smallest with the i-th smallest minimises the sum of absolute differences.
+
+```python
+def min_moves_to_seat(seats: list[int], students: list[int]) -> int:
+    return sum(abs(a - b) for a, b in zip(sorted(seats), sorted(students)))
+
+
+assert min_moves_to_seat([3, 1, 5], [2, 7, 4]) == 4
+assert min_moves_to_seat([4, 1, 5, 9], [1, 3, 2, 6]) == 7
+assert min_moves_to_seat([2, 2, 6, 6], [1, 3, 2, 6]) == 4
+```
+
+Complexity: O(n log n).
+F:
+- Prove the sorted pairing is optimal (exchange argument on crossing pairs).
+
+@@ Assign Cookies | Easy | Greedy two pointers
+Q: Child i is content with a cookie of size ≥ `g[i]`. Each child gets at most one cookie. Maximise the number of content children.
+
+Example: `g=[1,2,3], s=[1,1]` → `1`
+A:
+```python
+def find_content_children(g: list[int], s: list[int]) -> int:
+    g, s = sorted(g), sorted(s)
+    child = 0
+    for cookie in s:
+        if child < len(g) and cookie >= g[child]:
+            child += 1
+    return child
+
+
+assert find_content_children([1, 2, 3], [1, 1]) == 1
+assert find_content_children([1, 2], [1, 2, 3]) == 2
+assert find_content_children([], [1]) == 0
+```
+
+Complexity: O(n log n + m log m).
+F:
+- The same idea applies to matching GPU jobs to the smallest instance that fits.
+
+@@ Advantage Shuffle | Medium | Greedy matching
+Q: Permute `nums1` to maximise the number of indices where `nums1[i] > nums2[i]`.
+
+Example: `[2,7,11,15], [1,10,4,11]` → `[2,11,7,15]`
+A:
+Approach: the "Tian Ji horse race" greedy. Process `nums2` from largest to smallest. If our largest remaining value beats it, use it. Otherwise sacrifice our smallest.
+
+```python
+def advantage_count(nums1: list[int], nums2: list[int]) -> list[int]:
+    a = sorted(nums1)
+    lo, hi = 0, len(a) - 1
+    out = [0] * len(nums2)
+    for i in sorted(range(len(nums2)), key=lambda i: nums2[i], reverse=True):
+        if a[hi] > nums2[i]:
+            out[i] = a[hi]
+            hi -= 1
+        else:
+            out[i] = a[lo]
+            lo += 1
+    return out
+
+
+assert advantage_count([2, 7, 11, 15], [1, 10, 4, 11]) == [2, 11, 7, 15]
+assert advantage_count([12, 24, 8, 32], [13, 25, 32, 11]) == [24, 32, 8, 12]
+```
+
+Complexity: O(n log n).
+F:
+- Prove that sacrificing the smallest is never worse.
+
+@@ Queue Reconstruction by Height | Medium | Greedy insertion
+Q: `people[i] = [h, k]`, where k is the number of people in front who are at least h tall. Reconstruct the queue.
+
+Example: `[[7,0],[4,4],[7,1],[5,0],[6,1],[5,2]]` → `[[5,0],[7,0],[5,2],[6,1],[4,4],[7,1]]`
+A:
+Approach: sort by height descending and k ascending, then insert each person at index k. Shorter people inserted later don't change the counts of the taller people already placed.
+
+```python
+def reconstruct_queue(people: list[list[int]]) -> list[list[int]]:
+    out: list[list[int]] = []
+    for h, k in sorted(people, key=lambda p: (-p[0], p[1])):
+        out.insert(k, [h, k])
+    return out
+
+
+assert reconstruct_queue([[7, 0], [4, 4], [7, 1], [5, 0], [6, 1], [5, 2]]) == [
+    [5, 0], [7, 0], [5, 2], [6, 1], [4, 4], [7, 1]]
+assert reconstruct_queue([[6, 0], [5, 0], [4, 0], [3, 2], [2, 2], [1, 4]]) == [
+    [4, 0], [5, 0], [2, 2], [3, 2], [1, 4], [6, 0]]
+```
+
+Complexity: O(n²) because of list insertion. A Fenwick tree gives O(n log n).
+F:
+- Why does inserting taller people first work?
+
+@@ Reconcile Two Sorted Ledgers | Medium | Two-pointer merge
+Q: You have a bank statement and an internal ledger. Each is a list of `(date, ref, amount_cents)` sorted by `(date, ref)`, and `(date, ref)` is unique within each list. Produce a reconciliation report: matched entries, amount mismatches, entries only in the bank statement, and entries only in the ledger.
+A:
+Why it matters here: reconciliation is core Corporate Technology work (Finance, Treasury). The two-pointer merge is the same step a sort-merge join performs.
+
+Approach: walk both lists with two pointers, comparing keys. Equal keys are either matched or a mismatch. Otherwise, advance the side with the smaller key and report it as unmatched. Amounts are integers in minor units (cents) to avoid floating-point errors.
+
+```python
+from dataclasses import dataclass, field
+
+
+@dataclass
+class Report:
+    matched: list[tuple] = field(default_factory=list)
+    mismatched: list[tuple] = field(default_factory=list)
+    only_bank: list[tuple] = field(default_factory=list)
+    only_ledger: list[tuple] = field(default_factory=list)
+
+
+def reconcile(bank: list[tuple[str, str, int]], ledger: list[tuple[str, str, int]]) -> Report:
+    for name, rows in (("bank", bank), ("ledger", ledger)):
+        keys = [r[:2] for r in rows]
+        if keys != sorted(keys) or len(set(keys)) != len(keys):
+            raise ValueError(f"{name} must be sorted by (date, ref) with unique keys")
+    rep, i, j = Report(), 0, 0
+    while i < len(bank) and j < len(ledger):
+        kb, kl = bank[i][:2], ledger[j][:2]
+        if kb == kl:
+            if bank[i][2] == ledger[j][2]:
+                rep.matched.append(bank[i])
+            else:
+                rep.mismatched.append((*kb, bank[i][2], ledger[j][2]))
+            i, j = i + 1, j + 1
+        elif kb < kl:
+            rep.only_bank.append(bank[i])
+            i += 1
+        else:
+            rep.only_ledger.append(ledger[j])
+            j += 1
+    rep.only_bank.extend(bank[i:])
+    rep.only_ledger.extend(ledger[j:])
+    return rep
+
+
+bank = [("2026-09-01", "A1", 10_000), ("2026-09-01", "A2", 2_500), ("2026-09-02", "B7", 990)]
+ledger = [("2026-09-01", "A1", 10_000), ("2026-09-01", "A2", 2_050), ("2026-09-02", "C3", 400)]
+r = reconcile(bank, ledger)
+assert r.matched == [("2026-09-01", "A1", 10_000)]
+assert r.mismatched == [("2026-09-01", "A2", 2_500, 2_050)]
+assert r.only_bank == [("2026-09-02", "B7", 990)]
+assert r.only_ledger == [("2026-09-02", "C3", 400)]
+```
+
+Complexity: O(n + m) time after O(n log n) validation (or O(n) if you trust the sort order).
+
+Talking points: validate your inputs (fail loudly), use integer minor units, and make the report auditable.
+F:
+- Keys aren't unique and duplicates must be matched greedily by amount.
+- Fuzzy matching when references are missing (date ± 1 day and exact amount) and how you'd avoid double matches.
+- Scale to 100 million rows per day (push it into SQL as a FULL OUTER JOIN, or run it as a Spark job).

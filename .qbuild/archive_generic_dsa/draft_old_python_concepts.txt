@@ -1,0 +1,448 @@
+@@ Mutable vs immutable types | Easy | Core language
+Q: What is the difference between mutable and immutable types in Python, and why does it matter?
+A:
+- Immutable: `int`, `float`, `bool`, `str`, `bytes`, `tuple`, `frozenset`, `None`. Operations create new objects.
+- Mutable: `list`, `dict`, `set`, `bytearray` and most user-defined classes.
+
+Why it matters:
+
+- Hashability: only (deeply) immutable objects are safe dict keys or set members. A tuple that contains a list is not hashable.
+- Aliasing bugs: two names bound to the same list see each other's mutations.
+- Default arguments and shared state (see the mutable-default pitfall).
+- Thread safety: immutable data can be shared freely.
+- Performance: `str` concatenation in a loop creates a new object each time, so use `"".join`.
+
+```python
+a = [1, 2]; b = a; b.append(3)   # a is now [1, 2, 3]
+t = (1, [2]); t[1].append(3)     # allowed: the tuple holds a reference to a mutable list
+```
+F:
+- Is a tuple always hashable?
+- How would you make a custom class immutable?
+
+@@ How arguments are passed | Easy | Core language
+Q: Is Python pass-by-value or pass-by-reference?
+A:
+Neither exactly: it is "pass by object reference" (call by sharing). The function receives a reference to the same object, and the parameter name is a new local binding.
+
+- Mutating a mutable argument is visible to the caller.
+- Rebinding the parameter (`x = ...`) does not affect the caller.
+
+```python
+def f(items, n):
+    items.append(1)   # the caller sees this
+    n += 1            # rebinds the local name; the caller's int is unchanged
+```
+
+In practice, avoid surprising mutations of inputs: copy them, return new values, or document the mutation clearly.
+F:
+- How would you stop a function from mutating a caller's list?
+- Are `*args` copied when a function is called?
+
+@@ Mutable default argument pitfall | Easy | Core language
+Q: What is wrong with `def add(item, bucket=[])`?
+A:
+Default values are evaluated once, when the function is defined, so every call shares the same list:
+
+```python
+def add(item, bucket=[]):
+    bucket.append(item)
+    return bucket
+
+add(1)  # [1]
+add(2)  # [1, 2]  <- surprise
+```
+
+Fix it with a sentinel:
+
+```python
+def add(item, bucket: list | None = None):
+    bucket = [] if bucket is None else bucket
+    bucket.append(item)
+    return bucket
+```
+
+The same idea applies to dataclasses (`field(default_factory=list)`) and Pydantic (`Field(default_factory=list)`). Ruff's bugbear rule B006 flags the pattern.
+F:
+- Is there a legitimate use for this behaviour?
+- How do linters catch it?
+
+@@ is versus == | Easy | Core language
+Q: What is the difference between `is` and `==`?
+A:
+- `==` compares values through `__eq__`.
+- `is` compares identity: whether both names point to the same object.
+- Use `is` only for singletons such as `None`, `True`, `False` and sentinel objects (`x is None`).
+- CPython caches small integers (-5 to 256) and interns some strings, so `a is b` can be true by accident. Never rely on it.
+
+```python
+a = [1]; b = [1]
+a == b   # True
+a is b   # False
+```
+F:
+- Why is `x == None` discouraged?
+- What does `sys.intern` do?
+
+@@ Complexity of built-in collections | Medium | Core language
+Q: What are the time complexities of common operations on list, dict, set and deque?
+A:
+- `list`: index O(1); `append` amortised O(1); `pop()` O(1); `insert(0, x)` and `pop(0)` O(n); `in` O(n); `sort` O(n log n) (Timsort, stable).
+- `dict` / `set`: get, set, delete and `in` are O(1) on average and O(n) in the worst case (collisions); iteration O(n).
+- `collections.deque`: `append`, `appendleft`, `pop`, `popleft` O(1); indexing into the middle O(n).
+- `heapq`: push and pop O(log n); `heapify` O(n).
+- String building with `+=` in a loop can be O(n²); use `"".join(parts)`.
+
+In practice: sets for membership tests, deques for queues, heaps for top-k, `bisect` for sorted inserts.
+F:
+- Why is `list.append` amortised O(1)?
+- When does a dict lookup degrade?
+
+@@ How dict works internally | Medium | Internals
+Q: How does a Python dict work internally?
+A:
+- It is a hash table with open addressing. The key's `hash()` chooses a slot, and collisions are resolved by probing with a perturbation scheme.
+- Since Python 3.6 (guaranteed from 3.7) the layout is compact: a sparse index array points into a dense entries array of (hash, key, value). That preserves insertion order and saves memory.
+- The table resizes when it is about two-thirds full, which keeps inserts amortised O(1).
+- Keys must be hashable, with consistent `__hash__` and `__eq__`.
+- `str` and `bytes` hashes are randomised per process (`PYTHONHASHSEED`) to resist hash-flooding attacks.
+F:
+- Why must dict keys be immutable?
+- How does a set differ from a dict internally?
+
+@@ The __hash__ and __eq__ contract | Medium | Data model
+Q: What rules must `__hash__` and `__eq__` follow for custom objects?
+A:
+- If `a == b`, then `hash(a) == hash(b)`. The reverse does not need to hold.
+- The hash must not change while the object sits in a dict or set, so base it on immutable fields.
+- Defining `__eq__` without `__hash__` sets `__hash__ = None`, making instances unhashable.
+- Dataclasses: `@dataclass(frozen=True)` generates both safely; `unsafe_hash=True` on a mutable class is risky.
+
+```python
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class ModelId:
+    provider: str
+    name: str
+    version: str
+```
+F:
+- What breaks if a key's hash changes after insertion?
+- How should `__eq__` handle objects of a different type?
+
+@@ Shallow versus deep copy | Easy | Core language
+Q: What is the difference between a shallow and a deep copy?
+A:
+- Shallow copy (`copy.copy`, `list(x)`, `x[:]`, `dict.copy()`): a new container holding the same inner objects.
+- Deep copy (`copy.deepcopy`): recursively copies nested objects, handling cycles with a memo dict.
+
+```python
+import copy
+
+state = {"messages": [{"role": "user"}]}
+s = copy.copy(state)
+s["messages"].append({})        # mutates the original's list too
+d = copy.deepcopy(state)        # fully independent
+```
+
+`deepcopy` is slow on large structures, so prefer immutable data or targeted copies. In LangGraph, nodes should return new partial updates rather than mutate the state they received.
+F:
+- How do you customise copying for a class?
+- Why might `deepcopy` fail?
+
+@@ List comprehensions vs generator expressions | Easy | Core language
+Q: When would you use a generator expression instead of a list comprehension?
+A:
+- A list comprehension builds the whole list in memory; a generator expression yields items lazily.
+- Use generators for large or streaming data, single-pass consumption, or feeding aggregators such as `sum(d.tokens for d in docs)` or `any(...)`.
+- Use lists when you need `len`, indexing, multiple passes, or to materialise results before a resource closes.
+- Comprehensions are usually faster than equivalent loops that call `append`. Keep them readable and avoid deeply nested logic.
+F:
+- What happens if you iterate a generator twice?
+- Are dict and set comprehensions lazy?
+
+@@ Generators and yield | Medium | Core language
+Q: How do generators work? Explain `yield`, `yield from` and `send`.
+A:
+- A function containing `yield` returns a generator object. Each `next()` runs the body until the next `yield`, preserving local state between calls.
+- `yield from sub` delegates to a sub-generator, forwarding values, `send` calls and exceptions, and evaluates to the sub-generator's return value.
+- `gen.send(v)` resumes the generator and makes the paused `yield` expression evaluate to `v`; `throw()` and `close()` inject exceptions.
+- Typical uses: streaming large files, processing pipelines, chunking text for embeddings, lazy pagination.
+
+```python
+def chunks(tokens: list[str], size: int, overlap: int):
+    step = size - overlap
+    for start in range(0, max(len(tokens) - overlap, 1), step):
+        yield tokens[start:start + size]
+```
+F:
+- How do you get a generator's return value?
+- How are generators related to async coroutines?
+
+@@ Iterables vs iterators | Easy | Core language
+Q: What is the difference between an iterable and an iterator?
+A:
+- Iterable: has `__iter__()` returning an iterator (lists, dicts, strings, files).
+- Iterator: has `__next__()` (raising `StopIteration` when exhausted) and an `__iter__()` that returns itself. It is single-pass.
+- A `for` loop calls `iter()` once and then `next()` repeatedly.
+- Implementing `__iter__` as a generator gives you a re-iterable object cheaply:
+
+```python
+class Pages:
+    def __init__(self, client):
+        self.client = client
+
+    def __iter__(self):
+        token = None
+        while True:
+            page = self.client.list(page_token=token)
+            yield from page.items
+            token = page.next_token
+            if not token:
+                break
+```
+F:
+- Why is a file object an iterator while a list is not?
+- Which `itertools` functions do you use most?
+
+@@ Writing a retry decorator | Medium | Core language
+Q: Write a decorator that retries a function with exponential backoff. Why use `functools.wraps`?
+A:
+```python
+import functools
+import random
+import time
+
+def retry(times: int = 3, base: float = 0.5, exceptions=(Exception,)):
+    def decorator(fn):
+        @functools.wraps(fn)  # keep __name__, __doc__ and the signature
+        def wrapper(*args, **kwargs):
+            for attempt in range(1, times + 1):
+                try:
+                    return fn(*args, **kwargs)
+                except exceptions:
+                    if attempt == times:
+                        raise
+                    time.sleep(base * 2 ** (attempt - 1) * random.uniform(0.5, 1.5))
+        return wrapper
+    return decorator
+
+@retry(times=4, exceptions=(TimeoutError,))
+def call_model(prompt: str) -> str: ...
+```
+
+- A decorator that takes arguments is a factory that returns the real decorator.
+- `wraps` preserves metadata. That matters for FastAPI dependency signatures, LangChain `@tool` introspection, tracing and logs.
+- For coroutines, write an `async def wrapper` that awaits the call and uses `asyncio.sleep`.
+F:
+- How would you support both sync and async functions?
+- Which exceptions should never be retried?
+
+@@ Closures and late binding | Medium | Core language
+Q: What is a closure, and what is the late-binding gotcha in loops?
+A:
+- A closure is an inner function that captures variables from its enclosing scope (stored in cells).
+- Late binding: captured variables are looked up when the inner function runs, not when it is defined.
+
+```python
+fns = [lambda: i for i in range(3)]
+[f() for f in fns]                    # [2, 2, 2]
+
+fns = [lambda i=i: i for i in range(3)]  # bind the current value via a default
+[f() for f in fns]                    # [0, 1, 2]
+```
+
+`functools.partial` is the other common fix. The bug shows up when registering callbacks or building tool lists in a loop.
+F:
+- How does `nonlocal` relate to closures?
+- Where have you used closures in real code?
+
+@@ Function parameter kinds | Easy | Core language
+Q: Explain `*args`, `**kwargs`, keyword-only and positional-only parameters.
+A:
+```python
+def f(a, b, /, c, *, d, e=1, **kwargs): ...
+```
+
+- Before `/`: positional-only. Callers cannot pass them by name, so you can rename them freely.
+- Between `/` and `*`: positional or keyword.
+- After `*` (or after `*args`): keyword-only, which makes calls explicit (`timeout=`, `retries=`).
+- `*args` collects extra positional arguments into a tuple; `**kwargs` collects extra keyword arguments into a dict.
+- At call sites, `f(*items, **options)` unpacks them.
+
+Keyword-only parameters are good practice for boolean flags and option-heavy APIs.
+F:
+- Why do many built-ins use positional-only parameters?
+- How do you type `**kwargs` precisely (`Unpack` with a `TypedDict`)?
+
+@@ Scope rules LEGB, global and nonlocal | Easy | Core language
+Q: Explain Python's LEGB scope rule and the `global` and `nonlocal` keywords.
+A:
+- Name lookup order: Local → Enclosing function scopes → Global (module) → Built-ins.
+- Any assignment inside a function makes that name local for the whole function, which is why reading it before assignment raises `UnboundLocalError`.
+- `global x` rebinds the module-level name; `nonlocal x` rebinds the nearest enclosing function's name.
+- Comprehensions have their own scope (inlined for speed since 3.12 but still isolated).
+- Good practice: avoid mutating globals; pass state explicitly or encapsulate it in objects.
+F:
+- Why does `x += 1` inside a function raise `UnboundLocalError`?
+- How do class bodies interact with scoping?
+
+@@ Context managers | Medium | Core language
+Q: What are context managers, and how do you write one?
+A:
+- They guarantee setup and teardown around a `with` block through `__enter__` and `__exit__(exc_type, exc, tb)`. Returning `True` from `__exit__` suppresses the exception.
+- Uses: files, locks, database sessions and transactions, tracing spans, temporary configuration.
+
+```python
+from contextlib import contextmanager
+import time
+
+@contextmanager
+def timed(metric: str):
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        record(metric, time.perf_counter() - start)
+```
+
+- Async versions use `__aenter__`/`__aexit__` or `@asynccontextmanager`; FastAPI's lifespan and `httpx.AsyncClient` rely on them.
+- `contextlib.ExitStack` manages a dynamic number of resources; `suppress` and `closing` are handy helpers.
+F:
+- What happens if `__enter__` raises?
+- How does FastAPI use async context managers?
+
+@@ Exception handling best practices | Medium | Core language
+Q: How do you design exception handling in Python? Explain `raise ... from`, custom exceptions and exception groups.
+A:
+- Catch specific exceptions. Never use a bare `except:` (it catches `KeyboardInterrupt` and `SystemExit`). Reserve `except Exception` for boundaries such as an API handler or worker loop, and log there.
+- Define a domain hierarchy: `LLMError`, with `RateLimited(LLMError)` and `ContentFiltered(LLMError)`, so callers can handle categories.
+- Chain causes with `raise ProviderError("...") from e`; use `from None` only to hide a cause deliberately.
+- Use `finally` for cleanup and `else` for code that should run only when no exception occurred.
+- Since 3.11, `ExceptionGroup` and `except*` handle several concurrent failures (for example from a `TaskGroup`), and `e.add_note()` adds context.
+- Don't swallow errors silently, and don't use exceptions for normal control flow on hot paths.
+F:
+- How do you map internal exceptions to HTTP responses?
+- When do you retry, and when do you fail fast?
+
+@@ EAFP versus LBYL | Easy | Style
+Q: What do EAFP and LBYL mean, and which does Python prefer?
+A:
+- LBYL, "look before you leap": check first (`if key in d: value = d[key]`).
+- EAFP, "easier to ask forgiveness than permission": try it and handle the exception (`try: value = d[key] except KeyError: ...`).
+- Idiomatic Python favours EAFP. It avoids time-of-check/time-of-use races (checking a file exists, then opening it) and is often cleaner.
+- Use LBYL when failure is the common case and exceptions would be costly, or for explicit validation at API boundaries.
+F:
+- Give a race condition that EAFP avoids.
+- Are exceptions expensive in Python?
+
+@@ Dunder methods and the data model | Medium | Data model
+Q: Which dunder methods do you commonly implement, and what is the difference between `__repr__` and `__str__`?
+A:
+- `__repr__` is unambiguous and developer-facing (ideally something you could paste back into code) and appears in logs and debuggers. `__str__` is user-facing and falls back to `__repr__`.
+- Containers: `__len__`, `__getitem__`, `__iter__`, `__contains__`.
+- Comparison: `__eq__`, `__lt__` (with `functools.total_ordering`), `__hash__`.
+- Callables: `__call__`, for example a configured tool or retry policy object.
+- Context managers and async iteration: `__enter__`/`__exit__`, `__aenter__`/`__aexit__`, `__aiter__`/`__anext__`.
+- Others: numeric operators (`__add__`), `__bool__`.
+
+Security note: never include secrets in `__repr__`, because they end up in logs. Pydantic's `SecretStr` masks values automatically.
+F:
+- What is the difference between `__getattr__` and `__getattribute__`?
+- Why implement `__iter__` as a generator?
+
+@@ staticmethod, classmethod and instance methods | Easy | OOP
+Q: When do you use `@staticmethod`, `@classmethod` and regular instance methods?
+A:
+- Instance methods work with instance state through `self`.
+- `@classmethod` receives the class as `cls`. It is ideal for alternative constructors (`from_settings`, `from_env`) because it respects subclassing.
+- `@staticmethod` is a namespaced helper with no access to `self` or `cls`; it is often better as a module-level function.
+
+```python
+class ModelClient:
+    def __init__(self, endpoint: str, deployment: str) -> None: ...
+
+    @classmethod
+    def from_settings(cls, settings: "Settings") -> "ModelClient":
+        return cls(settings.endpoint, settings.deployment)
+```
+F:
+- Why is a classmethod better than a staticmethod for factories?
+- Can a classmethod be abstract?
+
+@@ Properties and descriptors | Medium | Data model
+Q: What are `@property` and descriptors, and when would you use them?
+A:
+- `@property` turns a method into a computed attribute with an optional setter and deleter. Uses: validation, lazy computation, keeping an API stable while the internals change.
+- The descriptor protocol (`__get__`, `__set__`, `__delete__` on a class attribute) controls attribute access on instances. `property`, functions (methods), `classmethod`, `staticmethod` and ORM columns such as SQLAlchemy's are all descriptors.
+- `functools.cached_property` computes a value once per instance (a non-data descriptor).
+
+```python
+class Prompt:
+    def __init__(self, text: str) -> None:
+        self._text = text
+
+    @property
+    def token_count(self) -> int:
+        return count_tokens(self._text)
+```
+F:
+- What is the difference between data and non-data descriptors?
+- Is `cached_property` thread-safe?
+
+@@ MRO and super | Medium | OOP
+Q: How does multiple inheritance work in Python? Explain the MRO and `super()`.
+A:
+- The method resolution order is computed with C3 linearisation, which preserves local precedence and monotonicity. Inspect it with `Cls.__mro__`.
+- `super()` calls the next class in the MRO, not necessarily the direct parent. That enables cooperative multiple inheritance, provided every class calls `super().__init__(**kwargs)`.
+- Mixins are small classes that add behaviour (`LoggingMixin`, `RetryMixin`) without their own complex state.
+- The MRO resolves the diamond problem, but composition is usually clearer for complex cases.
+F:
+- What happens if one class in the chain doesn't call `super()`?
+- When would you avoid mixins?
+
+@@ Metaclasses and __init_subclass__ | Hard | Data model
+Q: What are metaclasses, and when would you use one?
+A:
+- Classes are objects, and their type is a metaclass (by default `type`). A metaclass customises how classes are created.
+- Frameworks use them: SQLAlchemy's declarative base, Pydantic model construction, `ABCMeta`, `Enum`.
+- You rarely need one. Prefer `__init_subclass__` (a hook that runs when a class is subclassed, handy for plugin registries), class decorators or descriptors.
+
+```python
+class Tool:
+    registry: dict[str, type["Tool"]] = {}
+
+    def __init_subclass__(cls, *, name: str, **kwargs):
+        super().__init_subclass__(**kwargs)
+        Tool.registry[name] = cls
+
+class Search(Tool, name="search"): ...
+```
+F:
+- What is the difference between `__new__` and `__init__`?
+- How does Pydantic use a metaclass?
+
+@@ __slots__ | Medium | Performance
+Q: What does `__slots__` do, and when is it worth using?
+A:
+- It declares a fixed set of attributes stored in a compact array instead of a per-instance `__dict__`. The result is less memory (often 40–50% for small objects), slightly faster attribute access, and protection against typo attributes.
+- Trade-offs: no dynamic attributes, weak references need a `__weakref__` slot, and multiple inheritance with slots is awkward.
+- `@dataclass(slots=True)` (3.10+) generates slots for you.
+- Worth it when you create millions of small objects (tokens, graph nodes, events), not for ordinary service classes.
+F:
+- How would you measure the memory saving?
+- Do slots work with Pydantic models?
+
+@@ dataclass vs NamedTuple vs Pydantic vs attrs | Medium | Data modeling
+Q: When would you choose a dataclass, a NamedTuple, a Pydantic model or an attrs class?
+A:
+- `dataclass`: lightweight internal containers with type hints but no runtime validation; options such as `frozen`, `slots` and `kw_only`.
+- `NamedTuple`: immutable and tuple-compatible (unpacking, indexing); good for small records.
+- Pydantic `BaseModel`: validation and coercion at trust boundaries (API requests, LLM structured outputs, configuration), JSON Schema generation and serialisation. Slower than dataclasses, but fast in v2 thanks to its Rust core.
+- attrs: dataclass-like with validators and converters; mature, but less common in FastAPI stacks.
+
+Rule of thumb: validate at the edges with Pydantic and use dataclasses or TypedDicts internally.
+F:
+- Why do LLM structured outputs usually use Pydantic?
+- What does `TypeAdapter` do?

@@ -1,0 +1,1304 @@
+@@ Tell me about yourself | Easy | Introduction
+Q: Tell me about yourself and why you are a fit for LLM Suite Engineering.
+A:
+Aim for about 90 seconds using present → past → future:
+
+- Present: "I'm a backend/AI engineer with N years building Python services. For the last X years I've shipped LLM-powered and agentic features to production: LangGraph agents behind FastAPI services on Azure and AWS."
+- Past: two highlights with numbers, e.g. "built a RAG assistant used by 3,000 analysts and cut p95 latency from 9s to 3s", "added evaluation gates to CI that caught a regression before a model upgrade".
+- Future: "LLM Suite is one of the largest enterprise GenAI platforms. I want to help make agentic capabilities (MCP, A2A, orchestration) production-grade in a regulated environment."
+
+Tips: echo JD language (secure, reliable, production-ready, Azure OpenAI/Bedrock, FastAPI, LangGraph), don't recite your CV, and end on a hook the interviewer will want to ask about.
+F:
+- Which of those projects are you most proud of, and why?
+- What was your specific contribution versus the team's?
+- Why are you looking now?
+
+@@ Walk me through your most relevant project | Medium | Introduction
+Q: Walk me through the project on your CV that is most relevant to this role, end to end.
+A:
+Give a system tour the interviewer can probe at any point:
+
+- Problem and users: who used it, what pain it removed, the success metric.
+- Architecture: request path (client → FastAPI → orchestration/agent → model provider → tools/data), where state lives, how it is deployed (containers on AKS/EKS/ECS, serverless).
+- Your role: decisions you owned, alternatives you rejected and why.
+- Hard parts: one technical (streaming through a gateway, tool-call reliability) and one organisational (security review, data-access approvals).
+- Operations: monitoring, SLOs, incidents, cost.
+- Results: adoption, latency, accuracy, cost per request.
+- Retrospective: what you would change at 10x scale.
+
+Have a diagram you can draw in two minutes. JPMorganChase interviewers often ask candidates to design their own past system and then scale or critique it.
+F:
+- What breaks first at 10x traffic?
+- What would you do differently today?
+- How did you test and evaluate it?
+
+@@ Why JPMorganChase | Easy | Motivation
+Q: Why do you want to work at JPMorganChase?
+A:
+Layer three reasons and make them specific:
+
+- Scale and impact: LLM Suite went from zero to about 200,000 onboarded users within eight months of its summer 2024 launch, and it serves corporate functions such as Finance, Treasury, Risk, Compliance, Legal and HR. Small improvements multiply across a very large workforce.
+- Commitment: the firm invests heavily in technology (publicly reported at around $18B a year) and treats AI as strategic. LLM Suite won American Banker's 2025 Innovation of the Year grand prize.
+- Engineering maturity: you want to learn to ship AI that is secure, auditable and reliable in a regulated environment, which is harder and more valuable than demos.
+- Culture fit: connect one Business Principle (client service, operational excellence, integrity, team) to a real example of how you work.
+
+Avoid generic "prestigious bank" answers; tie everything back to this role and your story.
+F:
+- What do you know about our Business Principles?
+- Which other companies are you speaking to, and why us?
+- What would make you leave after a year?
+
+@@ Why LLM Suite Engineering | Easy | Motivation
+Q: Why this team? Why build on LLM Suite rather than an AI product somewhere else?
+A:
+- The problems are hard in the right ways: multi-model routing, entitlements, guardrails, reliability and cost for hundreds of thousands of users.
+- The JD targets the frontier: operationalising agent-to-agent communication, the Model Context Protocol, agentic orchestration, AI skills and personal assistants, moving from chat to agents that complete multi-step work.
+- Platform leverage: one capability, such as a governed MCP tool gateway, unlocks hundreds of use cases across the firm.
+- Your fit: map two or three concrete experiences (a LangGraph agent in production, FastAPI microservices on Azure/AWS, Azure OpenAI or Bedrock integrations).
+- Growth: the JD emphasises design discussions with senior engineers and applying feedback, which is how you like to learn.
+F:
+- Which JD requirement is your strongest, and which is your weakest?
+- What agentic capability would you want to ship first?
+- How would you explain LLM Suite to a new joiner?
+
+@@ What do you know about LLM Suite | Medium | JPMC & LLM Suite
+Q: What do you know about LLM Suite, and what engineering challenges do you think it has?
+A:
+Publicly reported facts (say "publicly reported"; don't claim inside knowledge):
+
+- JPMorganChase's proprietary GenAI platform that gives employees secure access to LLMs. Released in summer 2024; about 200,000 onboarded users within eight months; later reports cite around 250,000 employees with access.
+- Model-agnostic: an abstraction layer routes work to models from providers such as OpenAI and Anthropic, so models can be swapped as they improve. It is reportedly refreshed roughly every eight weeks.
+- Won American Banker's 2025 Innovation of the Year grand prize.
+- Stated direction: an "AI hub for employees", connecting more internal data sources and combining GenAI with workflows so agents can carry out multi-step tasks.
+
+Engineering challenges this implies: provider adapters and routing, entitlement-aware retrieval, guardrails, evaluation on every model change, quota and cost allocation, streaming at scale, observability, and now MCP/A2A-based integration of tools and agents.
+F:
+- What makes a model-agnostic platform hard to build?
+- How would you evaluate a new model before exposing it to users?
+- What would you build next?
+
+@@ Why Corporate Technology in London | Easy | Motivation
+Q: This role sits in Corporate Technology in London. Why does that appeal to you?
+A:
+- Corporate Technology builds for the firm's corporate functions: Global Finance, Corporate Treasury, Risk Management, HR, Compliance, Legal and the Corporate Administrative Office. That work is document-heavy and controls-heavy, which suits GenAI well.
+- An internal platform gives a short feedback loop with real users and measurable productivity outcomes.
+- London is a major JPMorganChase hub with global teams. Show that you are comfortable collaborating across New York, India and European time zones (overlap hours, written design docs, async updates).
+- Practical points to confirm: hybrid expectations and right to work.
+F:
+- How do you work effectively with colleagues in other time zones?
+- Which corporate-function use case interests you most?
+
+@@ Expectations of a Software Engineer III | Medium | Role expectations
+Q: What do you think is expected of a Software Engineer III (Senior Associate) compared with a more junior engineer?
+A:
+- Independent delivery: owns features end to end (design, code, tests, deployment, operation) with limited supervision.
+- Technical depth: writes secure, production-quality code, debugs complex issues, and documents trade-offs.
+- Collaboration: contributes actively to design reviews with senior and lead engineers, reviews code carefully, informally mentors juniors.
+- Operational ownership: monitoring, on-call, incident follow-ups, and control work such as change records and security findings.
+- Not yet expected: setting multi-team architecture or strategy (Lead/Principal level), though you influence it through proposals.
+
+Back each point with an example from your own experience.
+F:
+- Give an example of a design decision you owned end to end.
+- How do you decide when to escalate versus solve something alone?
+
+@@ Map your experience to the job description | Medium | Role fit
+Q: Take the job description line by line. Where are you strong, and where would you need to ramp up?
+A:
+Prepare this matrix before the interview:
+
+- System design, application development, testing, operational stability → one concrete story each.
+- Azure OpenAI and AWS Bedrock → what you used (deployments, quotas, content filters, Guardrails).
+- Python/FastAPI, microservices, APIs → services you built and their scale.
+- Elastic compute, NoSQL, messaging → e.g. autoscaled containers, DynamoDB/Cosmos DB, SQS/Kafka.
+- LangGraph agents → state design, checkpointers, interrupts, multi-agent patterns.
+- Large corporate environment, SQL, containerization → controls, legacy integration, Docker/Kubernetes.
+- A2A, MCP, AI skills, personal assistants, orchestrators → what you have prototyped, stated honestly.
+
+Close with a real gap and a plan: "A2A is newer for me. I've read the v1.0 spec and built a small client and server; next I'd like to run it behind our auth and observability." Honesty plus a learning plan beats claiming everything.
+F:
+- Show me your LangGraph experience in detail.
+- What is your plan to close the gap you mentioned?
+
+@@ Biggest technical achievement | Medium | Behavioral - achievement
+Q: What is your biggest technical achievement?
+A:
+Use STAR and spend most of the time on Action and Result:
+
+- Situation/Task: context and why it mattered (users, risk, scale).
+- Action: three or four decisions you personally made, with the alternatives. Show depth, for example moving from polling to SSE streaming, adding idempotency keys to tool calls, building an evaluation harness.
+- Result: numbers such as latency, cost, adoption, incident reduction or hours saved.
+- Reflection: what you learned and what you would improve.
+
+Pick something relevant to the JD (LLM platform, agents, reliability). Avoid a team achievement where your part is unclear.
+F:
+- What was the hardest trade-off?
+- Who disagreed with you, and how was it resolved?
+- How did you measure the result?
+
+@@ Most complex agentic system you have built | Hard | GenAI experience
+Q: Describe the most complex AI or agentic system you have built.
+A:
+Be precise, because interviewers will drill into every layer:
+
+- Goal, and why an agent (multi-step, tool use) rather than a single prompt or a fixed workflow.
+- Architecture: framework (e.g. LangGraph StateGraph), state schema, nodes and tools, routing, checkpointer (Postgres), human-in-the-loop interrupts, long-term memory store, models (Azure OpenAI, Bedrock), MCP tools.
+- Reliability: step limits, retries with backoff, idempotent tools, timeouts, fallbacks, structured outputs.
+- Safety: per-tool permissions, approval before side effects, prompt-injection mitigations, PII handling.
+- Evaluation: golden dataset, trajectory and tool-call evaluation, LLM-as-judge calibrated against humans, online feedback.
+- Operations: tracing (LangSmith/OpenTelemetry), cost per task, latency budget.
+- Results and the lessons you took away.
+F:
+- How did you prevent infinite loops?
+- How did you evaluate tool-call correctness?
+- What failed in production?
+
+@@ Why are you leaving your current role | Easy | Recruiter screen
+Q: Why are you looking to leave your current role?
+A:
+Keep it brief, positive and forward-looking:
+
+- Pull, not push: "I want to work on agentic AI at enterprise scale in a regulated environment, and LLM Suite is one of the few places doing that at this scale."
+- Growth: more design exposure with senior engineers, platform work with a larger blast radius.
+- Never criticise your current employer. If there is a real reason (reorganisation, cancelled project), state it neutrally in one sentence and move on.
+F:
+- What would your current manager say about you?
+- What would make you stay where you are?
+
+@@ Where do you see yourself in five years | Easy | Motivation
+Q: Where do you see yourself in three to five years?
+A:
+- Growth along the engineering track: from Senior Associate towards Lead Software Engineer level, owning a platform area such as the agent runtime, tool gateway or evaluation framework.
+- Depth: become a go-to engineer for agent reliability and security; contribute to internal standards or to open protocols such as MCP and A2A.
+- Impact: capabilities you built are used across several lines of business.
+- Keep it realistic and team-oriented; avoid "managing a team within a year".
+F:
+- What skills do you need to build to get there?
+- How would you know you are on track?
+
+@@ What are your strengths | Easy | Self-awareness
+Q: What are your main strengths?
+A:
+Pick two or three strengths that matter for this role and prove each with evidence:
+
+- Production mindset: "I design for failure with timeouts, retries and idempotency; my last service held 99.95% availability over a year."
+- Learning speed: "I shipped an MCP integration two weeks after picking up the spec."
+- Collaboration: "I ask for design reviews early; one review caught a data-residency issue before build."
+
+Avoid lists of adjectives. One short story per strength is enough.
+F:
+- Which of your strengths causes problems when overused?
+- How would your teammates describe you?
+
+@@ What is your biggest weakness | Easy | Self-awareness
+Q: What is your biggest weakness?
+A:
+Choose something real and non-fatal, then show the mitigation and evidence it is working:
+
+- "I used to go deep on my own before sharing a design. Now I write a one-page design note after a day and ask for review; it cut rework on my last two features."
+- Or: "Estimating uncertain AI work. I now timebox spikes and give ranges with explicit assumptions."
+
+Avoid fake weaknesses ("perfectionism") and weaknesses in core requirements ("I don't enjoy testing").
+F:
+- How do you know it is improving?
+- What feedback have you received recently?
+
+@@ How do you keep up with GenAI | Easy | Learning
+Q: GenAI changes monthly. How do you keep up, and how do you decide what to adopt?
+A:
+- Primary sources first: provider changelogs (Azure OpenAI in Microsoft Foundry, Amazon Bedrock), specification revisions (MCP 2026-07-28, A2A v1.0), LangChain/LangGraph release notes, selected papers.
+- Hands-on spikes: e.g. migrate a small MCP server to the stateless revision, or compare two models on your own evaluation set.
+- Community: engineering blogs, conference talks, internal guilds.
+- Filter: "Does this change our architecture, cost or risk?" Adopt through an evaluated experiment, not hype.
+
+Give one recent example of something you learned and applied at work.
+F:
+- What is the most important change in the last six months?
+- How do you decide whether to adopt a new framework?
+
+@@ JPMorganChase Business Principles | Medium | JPMC culture
+Q: What are JPMorganChase's Business Principles, and how would they show up in your engineering work?
+A:
+The firm describes four pillars in "How We Do Business":
+
+- Exceptional client service: for an internal platform the clients are employees and application teams, so clear docs, usable SDKs, dependable SLAs and fast response to feedback.
+- Operational excellence: tested code, observability, controlled releases, runbooks, blameless postmortems, cost discipline.
+- A commitment to integrity, fairness and responsibility: protecting data, reporting incidents and evaluation results honestly, responsible AI, following controls under deadline pressure.
+- A great team and winning culture: share credit, give and receive feedback, mentor, include people.
+
+Prepare one short story per pillar; behavioral questions are often mapped to them.
+F:
+- Which principle is hardest to live by under deadline pressure?
+- Give an example of operational excellence from your own work.
+
+@@ JPMorganChase AI strategy | Medium | JPMC & LLM Suite
+Q: How would you describe JPMorganChase's AI strategy from what is publicly known?
+A:
+Publicly reported themes:
+
+- Firmwide adoption: LLM Suite as the employee GenAI hub, used by a large share of staff.
+- Secure, model-agnostic platform: avoid lock-in to a single provider and keep data in controlled environments.
+- From assistants to agents: connect internal data and workflows so AI completes multi-step work (drafting, research, operations).
+- Heavy investment in data, AI talent and infrastructure, with firmwide AI adoption driven by the Chief Data & Analytics Office.
+- Value focus: productivity, client experience and risk management (fraud, compliance).
+
+Then show the engineering implications: platform reliability, cost management, controls, evaluation and change management for users.
+F:
+- What risks come with firmwide AI adoption?
+- How would you measure the value delivered?
+
+@@ GenAI in a bank versus a startup | Medium | Regulated environment
+Q: What is different about building GenAI in a global bank compared with a startup?
+A:
+- Risk and controls: model risk management, data classification, security, legal and compliance approvals, and an audit trail for prompts, outputs and actions.
+- Data: need-to-know entitlements, data residency, information barriers (for example between public-side and private-side teams), retention and eDiscovery.
+- Reliability: people depend on it for real work, so operational resilience and change management matter.
+- Scale and heterogeneity: many lines of business, legacy systems, identity and entitlement platforms to integrate.
+- Vendor risk: model providers are critical suppliers, which pushes towards multi-provider designs and exit plans.
+- Upside: enormous leverage, since a small gain times hundreds of thousands of users is large.
+
+Frame constraints as design inputs, not blockers.
+F:
+- How do you move fast within controls?
+- What is an information barrier, and why does it matter for RAG?
+
+@@ Build versus buy an enterprise LLM platform | Medium | Platform strategy
+Q: Why would a bank build its own LLM platform instead of rolling out an off-the-shelf assistant?
+A:
+Reasons to build:
+
+- Control: data stays in firm-controlled environments with custom logging, retention and audit.
+- Model agility: route each task to the best model and switch providers without retraining users.
+- Integration: firm identity, entitlements, internal data sources, internal APIs and workflow systems.
+- Governance: consistent guardrails, evaluation, usage policy and cost allocation per business unit.
+- Differentiation: proprietary workflows and agents are strategic assets.
+
+Costs of building: headcount, keeping pace with vendor features, consumer-grade UX expectations.
+
+Realistic answer: hybrid. Build the platform, gateway, integrations and governance; consume models and selected tools; adopt standards (MCP, A2A) so vendor agents and tools plug in.
+F:
+- Which components would you buy?
+- How do you keep up with vendor feature velocity?
+
+@@ Model-agnostic platform challenges | Medium | Platform strategy
+Q: What does "model-agnostic" mean for a platform like LLM Suite, and what makes it hard?
+A:
+Meaning: features and integrations don't depend on one model or provider. An abstraction layer routes each request to a model (for example a GPT model on Azure OpenAI or a Claude model on Bedrock) based on capability, cost, latency and policy.
+
+What makes it hard:
+
+- API differences: message formats, tool-calling schemas, structured-output support, streaming event shapes, token accounting.
+- Behavioural differences: a prompt tuned for one model degrades on another, so you need per-model prompt variants plus evaluations.
+- Capability gaps: context length, vision, reasoning controls, prompt caching.
+- Quotas, limits and error semantics differ (429s, content-filter responses).
+- Every model update needs regression evaluation.
+
+Techniques: a canonical internal request/response schema, provider adapters, a capability registry, routing policies, evaluation gates and feature flags.
+F:
+- How would you design the adapter layer?
+- What do you do with a model that doesn't support tool calling?
+
+@@ Measuring success of an internal GenAI platform | Medium | Product thinking
+Q: How would you measure the success of an internal GenAI platform?
+A:
+Use a balanced scorecard:
+
+- Adoption: DAU/WAU/MAU, share of eligible employees active, retention cohorts, usage of agents and tools.
+- Value: time saved (task-level instrumentation plus surveys), tasks completed by agents, business KPIs per use case.
+- Quality: feedback ratings, evaluation scores, grounding/hallucination rates, escalation rates.
+- Reliability: availability, time to first token, end-to-end latency, error rate against SLOs.
+- Cost: cost per active user and per task, token efficiency, cache hit rate.
+- Risk: policy violations blocked, incidents, data-leak near misses, audit findings.
+
+Avoid vanity metrics; measure against baselines for specific use cases.
+F:
+- How would you measure "time saved" credibly?
+- Which three metrics go on the leadership dashboard?
+
+@@ Agent use cases for corporate functions | Medium | Product thinking
+Q: Which agentic use cases would you prioritise for Finance, Treasury, Risk, Compliance, Legal and HR?
+A:
+Prioritise by value × feasibility × risk:
+
+- Finance: drafting variance commentary, triaging reconciliation exceptions, month-end close checklists.
+- Treasury: summarising liquidity reports, explaining cash-forecast movements.
+- Risk: summarising risk reports, gathering control-testing evidence, policy Q&A with citations.
+- Compliance: assisting alert triage (a human decides), summarising regulatory change and mapping it to policies.
+- Legal: clause extraction and comparison, first drafts from approved templates reviewed by lawyers.
+- HR: policy Q&A, job-description drafting, onboarding assistants.
+
+Principles: start read-only or draft-only with a human in the loop, cite sources, use entitlement-aware retrieval, measure against a baseline, and only then add actions behind approvals.
+F:
+- Which use case would you avoid initially, and why?
+- How would you evaluate the compliance use case?
+
+@@ Personal AI assistants at enterprise scale | Hard | Product thinking
+Q: The JD mentions personal AI assistants. What does it take to give every employee a personal assistant safely?
+A:
+- Identity and delegation: the assistant acts on behalf of one user with exactly that user's entitlements (on-behalf-of tokens, scoped consent), never broader.
+- Memory: per-user long-term memory (preferences, facts) that the user can inspect and delete, kept separate from shared knowledge.
+- Tools: email, calendar, documents and internal apps through governed connectors (MCP servers behind a gateway), least privilege, approval before side effects.
+- Proactivity: scheduled and background tasks with durable execution, notifications, and rate and cost caps.
+- Safety: prompt-injection defences for content read from email and documents, an audit trail of actions, a kill switch.
+- Scale: tenant isolation, quotas, cost per user, latency budgets.
+- UX: explain what it did and why, and make undo easy.
+F:
+- How do you stop the assistant leaking one user's data to another?
+- What happens when a malicious email contains instructions for the assistant?
+
+@@ How regulation shapes AI delivery in a bank | Medium | Regulated environment
+Q: How does regulation affect the way you ship AI features in a bank?
+A:
+- Model risk management: GenAI uses may need inventory, risk tiering, validation and monitoring (US SR 11-7; UK PRA SS1/23 principles).
+- Data protection: UK/EU GDPR (lawful basis, minimisation, DPIAs), client confidentiality, cross-border transfer rules.
+- Conduct and customer outcomes: e.g. the FCA Consumer Duty if outputs affect customers.
+- Accountability: named owners (UK Senior Managers and Certification Regime), approvals, audit trail.
+- EU AI Act for in-scope uses; for example credit scoring is classed as high-risk.
+- Operational resilience and third-party risk: critical suppliers, exit plans.
+
+Engineering translation: audit logging, evaluation evidence, access controls, human oversight, documentation and change control. You are not the lawyer; know when to involve risk and compliance.
+F:
+- What evidence would a model validator ask you for?
+- How does this change your release process?
+
+@@ Technology controls in a bank | Medium | Regulated environment
+Q: The organisation description mentions a "technology controls agenda". Which controls do you expect to work with as an engineer?
+A:
+- Change management: tickets, peer review, approvals, segregation of duties, deployment only through pipelines.
+- Access management: least privilege, periodic recertification, privileged access through break-glass procedures.
+- Secure SDLC: SAST, dependency (SCA) and secret scanning, penetration tests, vulnerability remediation SLAs.
+- Data controls: classification, encryption, DLP, retention.
+- Resilience: DR plans and tests, backups, capacity management.
+- Logging and monitoring: audit logs, SIEM integration.
+- Third-party and open-source approval: licences and provenance.
+
+Attitude: controls are part of "done", and you automate evidence (pipelines that produce audit artefacts) to keep velocity.
+F:
+- How would you automate control evidence?
+- What would you do if a control blocked an urgent fix?
+
+@@ What operational excellence means to you | Medium | JPMC culture
+Q: What does operational excellence mean to you as a software engineer? Give an example.
+A:
+- Definition: systems that behave predictably in production, and a team that learns from every failure.
+- Practices: SLOs with error budgets, dashboards and actionable alerts, runbooks, safe releases (canary, feature flags, fast rollback), tests that cover failure paths, capacity and cost reviews, blameless postmortems with tracked actions, automating toil.
+- GenAI specifics: evaluation gates on prompt and model changes, token and cost monitoring, provider fallback, guardrail metrics.
+- Example (STAR): "Our agent service timed out every week. I added per-dependency timeouts and a circuit breaker, a time-to-first-token SLO and a runbook. Pages fell from six a month to one, and MTTR from 90 to 20 minutes."
+F:
+- How do you choose SLO targets?
+- What is the difference between monitoring and observability?
+
+@@ Client service for an internal platform | Medium | JPMC culture
+Q: How does "exceptional client service" apply when your clients are internal teams and employees?
+A:
+- Know your clients: application teams integrating through APIs and SDKs, and end users of LLM Suite. Talk to them and watch usage data.
+- Make it easy: clear docs, quick-start samples, stable versioned APIs, useful error messages, sandbox environments.
+- Be dependable: published SLOs, a status page, proactive incident communication, deprecation notices with migration guides.
+- Be responsive: support triage SLAs, office hours, feedback flowing into the roadmap.
+- Say no well: explain the constraint (risk, capacity) and offer an alternative.
+
+Example: "After repeated 'why am I getting 429s?' tickets, I added a self-service quota dashboard; those tickets fell by 70%."
+F:
+- How do you prioritise between two client teams' requests?
+- How do you communicate a breaking change?
+
+@@ Stakeholder request that conflicts with policy | Medium | Integrity
+Q: A business stakeholder wants a feature that conflicts with a risk or data policy. How do you handle it?
+A:
+- Understand the underlying need: what outcome they want and why it is urgent.
+- Clarify the policy: read it and ask the control owner (security, data office, compliance) exactly what is prohibited and why.
+- Offer compliant alternatives: an approved internal model instead of an external API, redaction or pseudonymisation, a sandbox with synthetic data, human approval, narrower scope.
+- If it is still blocked, escalate transparently with options and risks written down, and let the accountable owners decide (possibly a formal risk acceptance).
+- Never quietly build the non-compliant path.
+
+Close with the outcome of a real example.
+F:
+- What if the stakeholder is very senior?
+- What is a risk acceptance, and who signs it?
+
+@@ Balancing innovation speed with safety | Medium | Judgment
+Q: How do you balance the speed of innovation with safety and risk in GenAI?
+A:
+- Tier by risk: internal read-only drafting is low risk; customer-facing or action-taking agents are high risk. Controls should be proportional.
+- Paved road: pre-approved components (gateway, guardrails, logging, evaluation harness) make the safe path the fast path.
+- Stage gates: sandbox prototype → limited pilot with human review → wider rollout with monitoring, each gate with explicit criteria (evaluation thresholds, security review).
+- Reversibility: feature flags, kill switches, versioned prompts and models, quick rollback.
+- Measurement: evaluations and monitoring tell you when it is safe to expand.
+- Involve risk partners early; late surprises are what really slow projects down.
+F:
+- What evidence would you need to move from pilot to firmwide rollout?
+- Give an example where you deliberately slowed something down.
+
+@@ Questions to ask the interviewer | Easy | Closing
+Q: Do you have any questions for us?
+A:
+Always ask two or three thoughtful questions tailored to the interviewer:
+
+- Technology: "What does the agent runtime behind LLM Suite look like today, and where is the biggest scaling pain?" "Are MCP and A2A used only internally, or also to integrate vendor agents?"
+- Practice: "How are model and prompt changes evaluated before release?" "What does on-call look like for this team?"
+- Success: "What would a great first six months look like in this role?"
+- Collaboration: "How are design decisions made across the LLM Suite teams?"
+- Growth: "How do engineers here progress towards Lead level?"
+
+Avoid questions the JD already answers, and keep compensation for the recruiter.
+F:
+- What else would you like to know about the team?
+
+@@ Received critical feedback and applied it | Medium | Behavioral - feedback
+Q: Tell me about a time you received critical feedback. What did you do with it?
+A:
+The JD explicitly asks for someone who seeks and applies feedback, so make this story strong.
+
+- Situation: e.g. reviewers said your pull requests were too large to review, or a design review found your agent had no failure handling.
+- Task: improve without being defensive.
+- Action: thanked the reviewer, asked for concrete examples, made a specific change (PRs under ~400 lines, a design note before coding, a failure-mode checklist) and asked for follow-up feedback a few weeks later.
+- Result: measurable change (review turnaround from three days to one, fewer post-merge bugs) and a better working relationship.
+- Lesson: you now ask for feedback at the design stage.
+F:
+- How did you feel when you received it?
+- When did you last ask for feedback proactively?
+
+@@ Gave difficult feedback to a peer | Medium | Behavioral - feedback
+Q: Tell me about a time you had to give difficult feedback to a colleague.
+A:
+- Situation: e.g. a peer repeatedly merged changes without tests, which caused incidents.
+- Action: a private conversation soon after a specific instance, using Situation–Behaviour–Impact: "In yesterday's deploy, the retry change went in without tests, and it caused the duplicate emails." Ask for their view (perhaps deadline pressure) and agree the fix together (pairing on tests, a CI coverage gate).
+- Result: the behaviour changed, incidents dropped, the relationship stayed intact.
+- Principles: specific, timely, private, about behaviour rather than the person, with a collaborative next step.
+F:
+- What if they had reacted defensively?
+- When would you involve a manager?
+
+@@ Disagreed with a senior engineer's design | Medium | Behavioral - collaboration
+Q: Tell me about a time you disagreed with a senior engineer's design.
+A:
+- Situation: e.g. a lead proposed synchronous sequential calls from the chat API to five tools; you worried about latency and cascading failures.
+- Action: did the homework first (measured p95 per tool, modelled the latency budget), raised it in the design review with data, proposed alternatives (parallel fan-out with per-tool timeouts, or an async job with streamed status) and acknowledged the strengths of their approach (simplicity).
+- Result: a hybrid was agreed and p95 met target. Or, if you were overruled, you committed fully and added monitoring that later informed a revision.
+- Show respect for experience and genuine openness to being wrong.
+F:
+- What would you do if you were overruled but still believed you were right?
+- How do you disagree in a written design doc?
+
+@@ Worked with a difficult teammate | Medium | Behavioral - collaboration
+Q: Tell me about a time you worked with a difficult teammate.
+A:
+- Situation: describe concrete behaviour (dismissive reviews, missed handoffs), not personality labels.
+- Action: sought to understand in a 1:1 (what pressures they had), aligned on shared goals, agreed working norms (review SLAs, clear ownership in tickets), kept discussions factual, and involved the manager only after trying directly.
+- Result: collaboration improved and the project delivered; say what you learned about empathy and clarity.
+- Avoid blame. Interviewers are listening for patience and professionalism.
+F:
+- What did you learn about yourself?
+- What would you have done if the behaviour didn't change?
+
+@@ Project that needed cross-team coordination | Medium | Behavioral - collaboration
+Q: Describe a project that required coordination across several teams.
+A:
+- Situation: e.g. integrating an agent with the identity and entitlements team, a document platform, the security review function and the UI team.
+- Action: mapped dependencies and owners; wrote a short integration spec (APIs, SLAs, dates); ran a weekly sync and a shared channel; tracked risks; agreed interface contracts early and used mocks so teams could work in parallel; escalated a blocked dependency with a clear, specific ask.
+- Result: delivered in X weeks, contract tests prevented integration breakages, and the pattern was reused by other teams.
+
+Emphasise the communication artefacts and how you managed risk proactively.
+F:
+- How did you handle a team that deprioritised your dependency?
+- What would you do differently next time?
+
+@@ Explaining technical issues to non-technical people | Easy | Behavioral - communication
+Q: Tell me about a time you explained a complex technical issue to a non-technical stakeholder.
+A:
+- Situation: e.g. a Compliance lead asked why the assistant had "made up" a regulation citation.
+- Action: explained hallucination with an analogy (very fluent autocomplete that predicts plausible text), what the team does about it (grounding in approved documents, citations, "I don't know" behaviour, evaluation), the residual risk, and what users should do (check citations). Used a one-page visual, no jargon, and confirmed understanding by asking which decision they needed to make.
+- Result: they approved a pilot with citations and a review step.
+- Tip: lead with the impact and the decision needed, not the mechanics.
+F:
+- How do you know they really understood?
+- How would you explain RAG in one sentence?
+
+@@ Helped a colleague grow | Medium | Behavioral - teamwork
+Q: Tell me about a time you helped a colleague grow.
+A:
+- Situation: a junior engineer new to async Python and LangGraph.
+- Action: paired on their first feature, shared a short reading list, gave them ownership of a well-scoped component with a safety net, explained the "why" in code reviews, gradually reduced support, and encouraged them to present at the team demo.
+- Result: they delivered the next feature independently, and you turned the experience into an onboarding guide.
+- Signal for this level: you multiply the team, not just your own output.
+F:
+- How do you adapt mentoring to different people?
+- What did you learn from mentoring?
+
+@@ Influencing without authority | Medium | Behavioral - influence
+Q: Tell me about a time you influenced a decision without formal authority.
+A:
+- Situation: e.g. you wanted teams to run an evaluation harness before shipping prompt changes.
+- Action: built a small prototype, showed a real regression it would have caught, quantified the cost of that incident, made adoption cheap (template repo, CI step), found an early-adopter team and shared their results.
+- Result: several teams adopted it and it became part of the release checklist.
+- Principles: evidence, empathy for other teams' priorities, and lowering the cost of saying yes.
+F:
+- Who resisted, and why?
+- What would you have done if nobody adopted it?
+
+@@ How you contribute in design discussions | Medium | Collaboration
+Q: How do you contribute to design discussions when working with more senior engineers?
+A:
+- Prepare: read the document beforehand and come with questions and data.
+- Clarify requirements and non-functional needs (latency, SLOs, security, cost) before jumping to solutions.
+- Probe failure modes: "What happens when the model endpoint times out?" "How do retries interact with tool side effects?"
+- Offer alternatives with trade-offs rather than bare objections.
+- Be concise, respect the timebox, and capture decisions and open questions (for example in an ADR).
+- Commit once decided; return with evidence if new data appears.
+- Learn deliberately: ask why senior engineers prefer certain patterns.
+F:
+- Give an example where your question changed a design.
+- How do you disagree respectfully in a meeting?
+
+@@ Disagreement with a product owner over scope | Medium | Behavioral - collaboration
+Q: Tell me about a time you disagreed with a product owner about scope or priorities.
+A:
+- Situation: the product owner wanted three extra tools added to an agent before launch, but evaluation coverage and reliability were not ready.
+- Action: framed it around the shared goal (a successful launch), quantified the risk (tool-selection accuracy fell from 92% to 78% on the evaluation set with the extra tools), proposed a phased scope (launch with the core tools, add the rest behind flags once evaluated), and wrote the trade-off down.
+- Result: the phased plan was agreed, launch was on time, and the extra tools shipped two sprints later with good metrics.
+F:
+- What if the product owner had insisted?
+- How do you say no without damaging the relationship?
+
+@@ Working across time zones | Easy | Behavioral - collaboration
+Q: Tell me about working in a globally distributed team.
+A:
+- Practices: written-first communication (design docs, clear tickets, decision logs), agreed overlap hours, rotating meeting times fairly, async stand-ups, recorded demos, explicit handoff notes.
+- Example: working with engineers in New York and Bengaluru on a shared service, you introduced a handoff template and contract tests so each location could progress independently, and cycle time dropped.
+- Cultural awareness: communication styles differ, so check understanding explicitly.
+F:
+- How do you handle an urgent issue when the owner is asleep?
+- How do you avoid decisions being made without remote teammates?
+
+@@ Asking for help early | Easy | Behavioral - teamwork
+Q: Tell me about a time you asked for help. How do you decide when to ask?
+A:
+- Rule of thumb: timebox it (30–60 minutes without progress, or sooner if it touches another team's domain or security), then ask with context: what you tried, your hypotheses, the logs.
+- Example: intermittent 502s on SSE streams through the gateway. After an hour you asked the platform team, who pointed at the load balancer idle timeout; heartbeat events fixed it.
+- The signal: humility, respect for other people's time, and speed.
+F:
+- How do you avoid asking too often?
+- How do you make it easy for others to ask you for help?
+
+@@ Ramping up on an unfamiliar codebase | Medium | Behavioral - learning
+Q: Tell me about a time you had to become productive quickly in a large, unfamiliar codebase.
+A:
+- Run it locally and read the architecture docs and ADRs.
+- Trace one request end to end with a debugger or logs.
+- Read the tests to learn intended behaviour; map the key modules.
+- Pick a small bug fix to learn the build and deployment pipeline.
+- Ask owners targeted questions; use git history to understand intent.
+- Write down what you learn and improve the onboarding docs.
+- Use code search and AI assistants carefully, verifying what they tell you.
+
+Result to quote: first PR in week one, owning a component by month two.
+F:
+- How do you decide what not to learn yet?
+- How do you avoid breaking things you don't fully understand?
+
+@@ Improving a team process | Medium | Behavioral - ownership
+Q: Tell me about a time you improved a team process.
+A:
+- Situation: e.g. pull requests waiting three days for review, or flaky CI.
+- Action: measured the baseline, proposed small changes (PR size guidance, a review rotation, CODEOWNERS, CI caching, quarantining flaky tests), piloted them for two sprints and collected feedback.
+- Result: review time from three days to six hours, CI from 25 to 9 minutes, and the team kept the changes.
+
+Show that the change was data-driven and collaborative rather than imposed.
+F:
+- How did you get buy-in?
+- What didn't work?
+
+@@ Disagree and commit | Medium | Behavioral - collaboration
+Q: Tell me about a time you committed to a team decision you initially disagreed with.
+A:
+- Situation: the team chose an approach you thought was suboptimal, e.g. a vector database you felt was over-engineered for the load.
+- Action: raised your concerns with data in the decision forum; once the decision was made, committed fully, implemented it well, documented the risks and added metrics to test the assumptions.
+- Result: either it worked and you learned something, or the data later justified a revision, which you raised constructively.
+- The signal: no quiet resistance and no "I told you so".
+
+Note the exception: if a decision is unsafe or unethical, you escalate rather than commit.
+F:
+- When would you revisit a decision?
+- Where is the line between disagreeing and escalating?
+
+@@ Saying no to a stakeholder | Medium | Behavioral - communication
+Q: Tell me about a time you had to say no to a stakeholder.
+A:
+- Situation: a request to wire an unapproved external API into an agent to hit a demo date.
+- Action: acknowledged the goal, explained why not (data policy, security review needed), offered alternatives (an approved internal model, a mocked demo with synthetic data, the expedited review route) and gave a realistic timeline.
+- Result: the demo went ahead on the mock, and the real integration was approved later.
+- Principles: "No, but here is what we can do", transparency, and protecting the relationship.
+F:
+- How do you handle pressure from someone senior?
+- When is "yes" the right answer despite the risk?
+
+@@ Taking ownership outside your role | Medium | Behavioral - ownership
+Q: Tell me about a time you took responsibility for something outside your formal role.
+A:
+- Situation: e.g. nobody owned expiring TLS certificates, an orphaned batch job, or alerting on a shared dependency.
+- Action: raised it, proposed an owner, removed the immediate risk (automated renewal, new alerts), documented it and handed it over cleanly.
+- Result: an outage avoided, and the practice adopted by other services.
+- Show initiative without overstepping: you worked with the actual owners rather than around them.
+F:
+- How do you avoid spreading yourself too thin?
+- What if the owning team hadn't welcomed your help?
+
+@@ Building trust with a new team | Easy | Behavioral - teamwork
+Q: How do you build trust when you join a new team?
+A:
+- Listen first: 1:1s with teammates and stakeholders; learn the history before proposing changes.
+- Deliver small wins early: fix a bug, improve a doc, take unglamorous tasks.
+- Be reliable: do what you say, and warn early if something slips.
+- Be transparent: share work in progress and admit mistakes quickly.
+- Give credit publicly and help others.
+
+Illustrate with what you did in your last team's first 90 days.
+F:
+- What did you change in your first 90 days last time?
+- How do you rebuild trust after a mistake?
+
+@@ Putting the team ahead of your own work | Easy | Behavioral - teamwork
+Q: Tell me about a time you helped the team succeed at the expense of your own individual work.
+A:
+- Situation: a release was at risk because a teammate's component was behind.
+- Action: paused your lower-priority feature, paired with them, wrote tests, took part of the work, and kept the manager informed of the trade-off.
+- Result: the release shipped on time; your feature slipped one sprint with stakeholder agreement.
+
+This shows the "great team and winning culture" principle plus clear communication about trade-offs.
+F:
+- How do you keep your own contribution visible?
+- When would you not do this?
+
+@@ Working with different working styles | Easy | Behavioral - collaboration
+Q: How do you work with someone whose working style is very different from yours?
+A:
+- Name the differences (planner vs explorer, written vs verbal, early vs last-minute).
+- Talk about preferences explicitly and agree norms: update cadence, where decisions are recorded, review expectations.
+- Use complementary strengths: one explores options, the other drives to closure.
+- Assume positive intent and focus on outcomes.
+
+Example: a data scientist who preferred notebooks. You agreed a handoff contract (tested, packaged functions with typed inputs), which made productionising their work smooth.
+F:
+- How would you describe your own working style?
+- Tell me about a style clash that didn't resolve.
+
+@@ Solving a hard problem creatively | Medium | Behavioral - problem solving
+Q: Tell me about a time you solved a tough technical problem with a creative approach.
+A:
+The JD asks for "creative approaches to solve complex technical challenges".
+
+- Situation: tool-selection accuracy collapsed as an agent's catalogue grew to 80 tools, and the context window was bloated.
+- Action: reframed the problem. Instead of prompting harder, you added retrieval over tool descriptions (embed the tool docs, select the top-k tools per turn), grouped tools into bundles loaded on demand, and built a 300-query evaluation set to measure selection accuracy.
+- Result: accuracy 71% → 93%, prompt tokens down 60%, latency down 35%.
+
+Explain the insight (why the conventional approach failed) and how you validated the new one.
+F:
+- Which alternatives did you reject?
+- How did you convince others it was safe?
+
+@@ Iterating quickly on feedback | Medium | Behavioral - delivery
+Q: Tell me about a time you took something from prototype to production by iterating quickly on feedback.
+A:
+The JD mentions "iterating quickly with feedback".
+
+- Situation: a policy-summarisation tool whose pilot users found the summaries too generic.
+- Action: shipped a thin prototype in a week to ten pilot users behind a flag; captured feedback (ratings plus comments); ran weekly iterations adding section-aware chunking, citations and a "key obligations" format; built an evaluation set from real user examples; hardened for production (auth, rate limits, logging, runbook) before a wide rollout.
+- Result: satisfaction 3.1 → 4.4 out of 5, rollout to 2,000 users, no Sev-1 incidents.
+
+The point is the balance: fast learning loops, then production discipline before scaling.
+F:
+- How did you decide it was ready for production?
+- Which feedback did you choose not to act on?
+
+@@ Production incident you handled | Medium | Behavioral - incidents
+Q: Describe a production incident you handled and what you changed afterwards.
+A:
+Show a calm sequence: contain, communicate, fix, prevent.
+
+- Situation: after a provider model update, structured outputs stopped parsing and 30% of requests failed.
+- Action: declared an incident; mitigated by pinning the previous model version and rolling back the prompt with a feature flag; posted updates every 30 minutes; found the root cause (schema adherence changed); fixed with strict structured outputs plus validation and repair; verified on a canary.
+- Result: mitigated in 25 minutes, resolved in three hours, no data loss.
+- Afterwards: blameless postmortem; model-version pinning, contract tests on output schemas, an evaluation gate for model upgrades, an alert on parse-failure rate, and incident documentation for the audit trail.
+
+In a bank, prevention and documentation land better than heroics.
+F:
+- How did you keep users informed during the incident?
+- What was the root cause behind the root cause?
+
+@@ Found an error others had missed | Medium | Behavioral - attention to detail
+Q: Tell me about a time you found an error that others had missed.
+A:
+- Situation: while reviewing a usage report used for chargeback, you noticed timezone-naive timestamps that double-counted usage around daylight-saving changes.
+- Action: reproduced it with a test, quantified the impact (about 3% overbilling to two business units), raised it privately with the owner, fixed it with timezone-aware UTC storage, added DST boundary tests, and sent corrected figures to the finance partners.
+- Result: accurate chargeback and a new CI check.
+
+Emphasise verifying before raising, respectful communication and a systemic fix.
+F:
+- How did you raise it without embarrassing the author?
+- What habits help you catch issues like this?
+
+@@ Asked to skip a required control | Medium | Integrity
+Q: What would you do if a manager asked you to skip a required control, such as a security review or tests, to meet a deadline?
+A:
+The expected answer is direct: you do not silently skip it.
+
+- Clarify the constraint and state the risk plainly: what could go wrong and who is exposed.
+- Propose alternatives: reduce scope, ship behind a flag to a limited pilot, request an expedited review, run the critical subset of tests, or move the date.
+- If pressure continues, escalate through proper channels (the control owner or risk partner) and document it. Only an accountable owner can grant a formal exception.
+- Never falsify evidence or bypass the control.
+F:
+- What if everyone else on the team was doing it?
+- When is an exception legitimate?
+
+@@ Missed a deadline or goal | Medium | Behavioral - accountability
+Q: Tell me about a goal or deadline you missed. What happened next?
+A:
+Spend most of the answer on what you changed.
+
+- Situation: an agent integration slipped two weeks because the entitlement integration was underestimated.
+- Action: flagged the slip as soon as you knew, not at the deadline; re-planned with options (reduced scope vs a new date); delivered a partial capability; ran a retrospective.
+- Changes you made: spikes on unknown dependencies before committing dates, estimates as ranges, explicit dependency tracking, earlier integration tests.
+- Result: the next project landed on its date.
+F:
+- When did you first realise you would miss it?
+- How did stakeholders react?
+
+@@ Tell me about a failure | Medium | Behavioral - accountability
+Q: Tell me about a time you failed.
+A:
+- Choose a real failure with meaningful stakes: not trivial, and not misconduct.
+- Own it without excuses: "I chose X, and it was wrong because…"
+- Explain how you recovered and limited the impact.
+- Show what you learned and the evidence you have applied it since.
+
+Example: you launched a feature without load-testing long-lived streaming connections; the gateway hit its connection limit on day one and you rolled back. You now include connection-level capacity tests and staged rollouts in every launch plan.
+F:
+- What would you do differently?
+- How did your team respond?
+
+@@ Deciding with incomplete information | Medium | Behavioral - judgment
+Q: Tell me about a time you had to make a decision with incomplete information.
+A:
+- Situation: choosing a vector store or model provider before full benchmarks were available, with a deadline approaching.
+- Action: identified what mattered (latency, filtering, operational burden, security approval), gathered quick evidence (a one-day spike on representative data), judged reversibility (two-way doors decide fast; one-way doors slow down), chose with written assumptions and an exit plan (an abstraction layer), and set checkpoints to revisit.
+- Result: shipped on time and revisited at month three with real metrics.
+F:
+- How do you tell a one-way door from a two-way door?
+- What happens if your key assumption proves wrong?
+
+@@ Learned a new technology quickly | Easy | Behavioral - learning
+Q: Tell me about a time you had to learn a new technology quickly.
+A:
+- Situation: you needed to build an MCP server and connect it to a LangGraph agent within two weeks.
+- Action: read the spec and SDK docs, built a toy end-to-end in a day, listed production concerns (auth, timeouts, error handling), asked experts targeted questions, wrote tests, and documented what you learned.
+- Result: shipped on time, became the team's reference point, and ran a knowledge-sharing session.
+
+Describe your learning method; "I'm a fast learner" on its own is not evidence.
+F:
+- What was hardest to learn?
+- How do you avoid shallow understanding when learning fast?
+
+@@ Prioritising competing urgent tasks | Easy | Behavioral - prioritization
+Q: How do you prioritise when several urgent tasks land at once?
+A:
+- Triage by impact and urgency: production incidents and security issues first, then commitments others depend on, then the rest.
+- Clarify with stakeholders what is truly urgent and what delay costs.
+- Make trade-offs visible: tell affected people what slips and agree it with your manager.
+- Protect focus time, break work down, and share or delegate where you can.
+
+Example: an incident, a feature deadline and a review queue at once. You handled the incident, negotiated a one-day slip on the feature, and batched the reviews.
+F:
+- What do you do when two stakeholders both claim top priority?
+- How do you handle constant interruptions?
+
+@@ Reducing technical debt while delivering | Medium | Behavioral - engineering quality
+Q: Tell me about a time you reduced technical debt while still delivering features.
+A:
+- Situation: LLM-calling code was duplicated across services, each with its own retry logic and inconsistent logging.
+- Action: quantified the cost (incidents, time per change), proposed an incremental refactor into a shared client library (retries, timeouts, logging, tracing), wrote tests first, migrated service by service behind feature flags, and applied the "leave it better" rule during feature work.
+- Result: shorter lead time for changes, no more incidents from inconsistent retries, and features kept shipping.
+F:
+- How did you justify the time to the product owner?
+- How do you decide which debt to pay down first?
+
+@@ Improving reliability of a system | Medium | Behavioral - operational stability
+Q: Tell me about a time you significantly improved the reliability or operational stability of a system.
+A:
+- Situation: an internal RAG service at 97% availability with frequent timeouts at peak.
+- Action: analysed incidents (slow vector queries, provider 429s, missing timeouts); added timeouts and jittered retries, a circuit breaker, per-dependency bulkheads, embedding caching, autoscaling on queue depth and provider fallback; defined SLOs, alerts and runbooks.
+- Result: availability 97% → 99.9%, p95 latency down 40%, pages down 80%.
+F:
+- How did you prioritise which fixes to do first?
+- How did you verify the improvement was real?
+
+@@ Making a significant performance improvement | Medium | Behavioral - performance
+Q: Tell me about a time you made a significant performance improvement.
+A:
+- Measure first: profile (py-spy, tracing spans) instead of guessing.
+- Example: chat p95 was 12 seconds. Traces showed sequential retrieval, reranking and two LLM calls. You parallelised retrieval, cached embeddings, streamed the answer, moved one call to a smaller model and trimmed prompts by 40%.
+- Result: time to first token 4s → 0.9s, p95 end-to-end 12s → 6s, cost down 30%.
+- Mention that you ran the evaluation suite to confirm quality did not regress.
+F:
+- How did you make sure quality didn't drop?
+- What did you try that didn't help?
+
+@@ Turning ambiguity into a concrete plan | Medium | Behavioral - ambiguity
+Q: Tell me about a time you turned an ambiguous requirement into a concrete plan.
+A:
+- Situation: "Build an agent for the risk team" with no defined scope.
+- Action: interviewed users and observed their workflows, ranked the top three tasks by time spent, defined success metrics and non-goals, wrote a one-page phased proposal, built a thin slice to validate it, and got sign-off.
+- Result: a clear roadmap, with phase one delivered in six weeks and measurable time savings.
+
+The signal: you reduce ambiguity through discovery and writing, not by waiting for perfect requirements.
+F:
+- What did you deliberately leave out?
+- How did you handle requirements changing later?
+
+@@ Pushing back on an unrealistic estimate | Medium | Behavioral - communication
+Q: Tell me about a time you pushed back on an unrealistic deadline or estimate.
+A:
+- Situation: asked to deliver a multi-agent workflow, including security review, in three weeks.
+- Action: broke down the work, identified the unknowns (review lead time, integrations), gave a range with assumptions, and offered options: a single agent with human review by week three, full scope by week seven. You also flagged the risk of cutting testing.
+- Result: stakeholders chose the phased option, you delivered as promised, and you built credibility.
+F:
+- What if the date genuinely could not move?
+- How do you estimate AI work when quality is uncertain?
+
+@@ A mistake you made in production | Medium | Behavioral - accountability
+Q: Tell me about a mistake you made that reached production.
+A:
+- Own it: e.g. a config change disabled a tenant's rate limit and caused a cost spike.
+- Response: detected by a cost alert, rolled back, notified stakeholders, quantified the impact.
+- Prevention: config validation in CI, staged config rollout, peer review for config changes, better alert thresholds.
+- Reflection: treat configuration as code.
+
+Keep it honest and specific, and focus on what you learned.
+F:
+- How was it detected?
+- What did the team change as a result?
+
+@@ Automating a manual process | Easy | Behavioral - efficiency
+Q: Tell me about a time you automated a manual process.
+A:
+- Situation: weekly prompt evaluation runs took four hours by hand and got skipped under pressure.
+- Action: built a CI job that runs the evaluation suite on every prompt or model change, posts a diff report on the pull request and blocks merges on threshold regressions.
+- Result: about 200 hours a year saved, three regressions caught before release, and evidence for audit.
+F:
+- How did you make sure the automation was trustworthy?
+- What did you choose not to automate?
+
+@@ Working under pressure | Easy | Behavioral - resilience
+Q: Tell me about a time you had to work under significant pressure.
+A:
+- Situation: a firmwide launch in 48 hours and a critical bug in streaming reconnects.
+- Action: stayed calm, prioritised the critical path and deferred nice-to-haves, gave regular status updates, split the work across the team, kept testing discipline (no untested hotfix) and used a feature flag as a safety net.
+- Result: launched on time with the bug fixed and covered by tests.
+
+Show a sustainable approach rather than heroics, and mention what you changed to avoid the crunch next time.
+F:
+- How do you avoid burnout?
+- What would you change to avoid that pressure in future?
+
+@@ Your most challenging bug | Medium | Behavioral - debugging
+Q: Tell me about the most challenging bug you have debugged.
+A:
+Structure: symptom → hypotheses → evidence → root cause → fix → prevention.
+
+- Symptom: agents occasionally created the same ticket twice.
+- Evidence: logs showed client retries after exactly 60 seconds.
+- Root cause: the load balancer's idle timeout closed quiet streaming connections, the client retried the whole request, and the ticket tool was not idempotent.
+- Fix: heartbeat events on the SSE stream, idempotency keys on tool calls, server-side dedupe, a safer client retry policy.
+- Prevention: a fault-injection test for dropped connections and an alert on duplicate-key hits.
+
+Highlight the method: reproduce, add instrumentation, test one hypothesis at a time.
+F:
+- How did you reproduce it?
+- Which tooling helped most?
+
+@@ Going above and beyond for a user | Easy | Behavioral - client service
+Q: Tell me about a time you went above and beyond for a client or user.
+A:
+- Situation: a Legal team couldn't use the document Q&A tool because their scanned PDFs weren't parsed.
+- Action: went beyond the ticket. You analysed their document types, added an OCR and layout-parsing step, validated it on their sample set, trained their power users and set up a feedback channel.
+- Result: adoption across the team, and the ingestion step became a reusable capability.
+- Balance: you did it within agreed priorities, with your manager's support.
+F:
+- How did you balance this with your other commitments?
+- How did you measure the client's satisfaction?
+
+@@ Raising a security or compliance concern | Medium | Integrity
+Q: Tell me about a time you raised a security or compliance concern.
+A:
+- Situation: you noticed an agent's logs captured full prompts, including client names and account numbers, retained indefinitely in a widely accessible index.
+- Action: verified it, informed the owner and the security team through the proper channel, proposed a fix (redact PII before logging, restrict access, apply a retention policy), helped implement it, and checked whether it needed to be reported as an incident.
+- Result: fixed within a sprint, and redaction became a shared library.
+
+Show courage, process and collaboration, not blame.
+F:
+- What if the team lead had dismissed the concern?
+- How do you decide whether something counts as an incident?
+
+@@ Colleague committed a secret to a repository | Medium | Integrity
+Q: What would you do if you found that a colleague had committed an API key or other secret to a repository?
+A:
+- Treat the secret as compromised immediately, whatever the repository's visibility.
+- Follow the incident process: tell the colleague and the owner or security team, and revoke or rotate the secret first. That is the most important step.
+- Then remove it from code and history (git filter-repo or BFG), knowing that rewriting history does not un-leak it.
+- Check access logs for misuse and document what happened.
+- Prevent recurrence blamelessly: pre-commit and server-side secret scanning, a secrets manager or managed identity so there are no keys in code, and a short training note.
+F:
+- Why isn't deleting the commit enough?
+- How do you avoid static keys entirely on Azure and AWS?
+
+@@ LLM feature producing harmful outputs | Hard | Responsible AI
+Q: An LLM feature you built is found to be producing biased or harmful outputs in production. What do you do?
+A:
+- Contain: assess severity and scope; if material, disable or restrict the feature with a kill switch or flag, and add a temporary output filter.
+- Communicate: follow the incident process and inform the product owner, risk and compliance, and affected users where appropriate.
+- Investigate: collect examples, reproduce, find the cause (prompt, retrieved data, model update, missing guardrail) and measure prevalence with a targeted evaluation set.
+- Fix: adjust prompts and instructions, correct data, add moderation guardrails, change the model, or add human review for sensitive outputs.
+- Prevent: add the cases to regression and red-team suites, monitor for the pattern, and document everything for audit.
+F:
+- How do you measure bias in generative outputs?
+- Who decides when the feature can be switched back on?
+
+@@ Sending confidential data to an unapproved model | Hard | Integrity
+Q: A senior stakeholder asks you to send confidential client data to a public, unapproved model API because it gives better results. How do you respond?
+A:
+- Decline, respectfully, and explain why: data classification rules, client confidentiality and vendor risk. An unapproved endpoint lacks the contractual protections on retention, training use and residency.
+- Understand the need: what exactly is better (reasoning, context length, a specific capability)?
+- Offer approved paths: the same or a similar model through the firm's approved channels (for example Azure OpenAI or Bedrock under enterprise terms via the platform), evaluation on their use case, redaction or pseudonymisation, or a request to onboard the model through the model-approval process.
+- If pressed further, escalate and document.
+F:
+- How could you legitimately speed up onboarding a new model?
+- Which contractual protections matter with model providers?
+
+@@ Handling PII responsibly | Medium | Data protection
+Q: Tell me about a time you handled sensitive data or PII in a system you built.
+A:
+- Principles: data minimisation, classification, encryption in transit and at rest, least-privilege audited access, redaction or pseudonymisation before data reaches models or logs, retention and deletion rules, and involvement in the DPIA.
+- Example: ingestion for HR documents. PII was detected with a recogniser (e.g. Microsoft Presidio) and masked before indexing, retrieval applied entitlement filters, logs were redacted and retention was 90 days.
+- Testing: seeded synthetic PII to prove the redaction worked, plus periodic audits.
+F:
+- How do you handle PII that ends up in embeddings?
+- How do you honour a deletion request across the system?
+
+@@ Healthy dashboards but unhappy users | Medium | Product thinking
+Q: Your AI feature's dashboards look healthy, but users are complaining. What do you do?
+A:
+- Take complaints seriously: the metrics may measure the wrong thing (availability is not usefulness).
+- Gather specifics: sample complaints, pull the session traces, talk to five to ten users.
+- Segment the metrics by user group, document type, query type and time of day. Averages hide failure pockets such as long documents or one business unit.
+- Check quality signals: grounding, citation accuracy, refusal rate, the p99 latency tail, streams that stall.
+- Add the missing metrics: task success, re-ask rate, copy rate, abandonment, thumbs-down reasons.
+- Close the loop: add the failing cases to the evaluation set and tell users what changed.
+F:
+- Which implicit signals indicate dissatisfaction?
+- How do you prevent this blind spot in future?
+
+@@ When AI is not the right answer | Medium | Judgment
+Q: How do you decide that an LLM or agent is not the right solution?
+A:
+Prefer a simpler solution when:
+
+- Deterministic rules suffice (validation, calculations, routing on known fields): cheaper, testable, explainable.
+- Exactness is required (financial or regulatory numbers): compute in code or SQL; an LLM can explain the result but should not calculate it.
+- Latency or cost constraints are extreme (very high-QPS paths).
+- The data is structured and a search or filter UI solves the need.
+- Errors are unacceptable and can't be caught by review.
+- The problem itself is unclear, and an LLM would only hide requirement gaps.
+
+LLMs fit unstructured language, variability, drafting, summarisation and fuzzy classification with human review. The best answer is often hybrid: a deterministic workflow with LLM steps.
+F:
+- Give an example where you replaced an LLM with plain code.
+- How would you handle a stakeholder who wants "AI" regardless?
+
+@@ Challenging the status quo | Medium | Behavioral - courage
+Q: Tell me about a time you challenged the status quo.
+A:
+- Situation: the team tested prompts by hand, because "that's how we've always done it".
+- Action: gathered evidence (regressions that had shipped), proposed evaluation-driven development, built a lightweight harness, ran it alongside the old process to prove value, took concerns (false positives) seriously and iterated.
+- Result: it became the standard and regressions dropped.
+
+Tie it to courage and integrity: you challenged respectfully and with data.
+F:
+- What resistance did you face?
+- When should you not challenge the status quo?
+
+@@ Delivering bad news to stakeholders | Medium | Integrity
+Q: Tell me about a time you had to deliver bad news to stakeholders.
+A:
+- Situation: two weeks before launch, evaluation showed the agent at 70% accuracy against the 90% that had been promised.
+- Action: told stakeholders immediately with the facts, the options (delay; launch a narrower scope with human review; invest in better data), your recommendation and what you were already doing about it. No sugar-coating.
+- Result: they chose the narrower launch with review, and trust was maintained.
+- Principle: bad news travels early, with a plan attached.
+F:
+- How do you deliver bad news to a senior executive?
+- What if the bad news was your own fault?
+
+@@ Ensuring auditability | Medium | Regulated environment
+Q: How do you make the systems you build auditable?
+A:
+- Structured, immutable audit events: who, what, when and why. Include user identity, action, inputs and outputs (or redacted versions or hashes), model and prompt versions, tool calls, approvals, and correlation IDs across services.
+- Tamper evidence: append-only storage (WORM or object lock), hash chaining, restricted access, retention per policy.
+- Reproducibility: version code, prompts, model versions, retrieval index snapshots and configuration, and record decoding parameters.
+- Change evidence: PR reviews, pipeline logs and approvals linked to tickets.
+- Queryable: audit data in a searchable store that is reviewed regularly.
+- Privacy balance: redact PII in logs and control access to audit data.
+F:
+- How would you reconstruct why an agent took an action last month?
+- How do you audit without storing sensitive prompts?
+
+@@ Migrating off a retiring model | Medium | Platform operations
+Q: A model your feature depends on will be retired in 60 days. How do you plan the migration?
+A:
+- Inventory: which features, prompts and tenants use it, traffic volumes, and special capabilities relied on (tool calling, JSON output, context length).
+- Candidates: shortlist by capability, cost, latency and availability in the required regions and deployment types; check quota.
+- Evaluate: run the regression suites (task metrics, format adherence, safety) and tune prompts per candidate.
+- Roll out: shadow traffic → canary percentage → full, behind flags, watching quality, latency and cost, with a rollback path.
+- Communicate: consumer teams, dates, updated docs.
+- Prevent surprises: a model abstraction, version pinning, evaluations that can run at any time, and tracking of provider lifecycle notices (Azure OpenAI and Bedrock both publish retirement dates).
+F:
+- What if no replacement matches the quality?
+- How do you avoid being surprised by retirements?
+
+@@ Ethically questionable AI use case | Hard | Responsible AI
+Q: You are asked to build an AI feature that feels ethically questionable, for example analysing employee chats to score productivity. How do you handle it?
+A:
+- Clarify purpose and scope: what decision it supports, who is affected, and whether it is proportionate.
+- Raise concerns early with the product owner and the right partners (HR, legal, privacy, compliance, AI governance). Monitoring employees has legal implications (UK GDPR lawful basis, DPIA, transparency, works councils in parts of the EU) and trust implications.
+- Propose alternatives: aggregated or anonymised insights, opt-in tools, explicit consent, or helping employees rather than scoring them.
+- If the firm proceeds lawfully with governance approval, build in safeguards: transparency, minimisation, human review, fairness testing.
+- If you believe it is unlawful or unethical, escalate under the code of conduct; you can decline to take part.
+F:
+- Where do you draw your personal line?
+- Which UK regulations apply?
+
+@@ Using data to make a decision | Medium | Behavioral - judgment
+Q: Tell me about a time you used data to make or change a decision.
+A:
+- Situation: the team was debating moving to a larger model to fix answer quality.
+- Action: analysed 500 failed conversations and found 60% were retrieval misses, not reasoning failures. You then compared retrieval fixes (hybrid search plus a reranker) with the bigger model on the evaluation set.
+- Result: the retrieval fix improved answer accuracy by 18 points at a fifth of the cost of the model upgrade, and the decision changed.
+
+Show hypothesis-driven analysis, representative sampling and clear communication of the result.
+F:
+- How did you make sure the sample was representative?
+- What do you do when the data and your intuition disagree?
+
+@@ Executive complains about a hallucination | Medium | Stakeholder management
+Q: A senior executive complains that LLM Suite gave them a confidently wrong answer in an important meeting. How do you respond?
+A:
+- Respond quickly and personally, acknowledge the impact and get specifics (prompt, time, conversation ID).
+- Investigate with traces: model, retrieved sources, prompt version. Classify the cause: no grounding, a bad source, a model error or an ambiguous question.
+- Explain in plain language what happened and what you are doing, without defensiveness or blaming "the model".
+- Fix the specific case (correct the source, tune retrieval, add a guardrail), add it to the evaluation set, and consider UX changes such as prominent citations or prompts to verify.
+- Follow up with the executive, and use the case (anonymised) in user education.
+F:
+- How do you explain residual hallucination risk to executives?
+- Which UX patterns reduce over-reliance?
+
+@@ Accountability when an agent takes a wrong action | Hard | Responsible AI
+Q: If an AI agent takes a wrong action, such as sending an incorrect email or updating the wrong record, who is accountable, and how should the system be designed?
+A:
+Accountability stays with people and the firm: the business owner of the process, the approving user where human-in-the-loop applies, and the engineering owners for design flaws. Under UK SM&CR-style regimes, named senior managers remain accountable for their areas; an agent does not change that.
+
+Design implications:
+
+- Classify actions (read, reversible write, irreversible) and gate high-impact ones behind approval.
+- Use least-privilege, user-delegated credentials and record the agent's identity.
+- Make actions idempotent, and provide undo or compensation plus a dry-run preview where possible.
+- Keep a full audit trail: inputs, a reasoning summary, tool calls, approver.
+- Monitor, keep a kill switch, and route failures into the incident process.
+F:
+- Which actions should always need human approval?
+- How would you implement undo for agent actions?
+
+@@ Your first 90 days on the team | Medium | Scenario
+Q: If you joined the LLM Suite Engineering team, what would you do in your first 90 days?
+A:
+- Days 1–30, learn: set up the environment and ship a small fix; understand the architecture (gateway, orchestration, model adapters, tools, data), SLOs, incidents and controls; meet stakeholders; read ADRs and postmortems.
+- Days 31–60, contribute: own a scoped feature end to end, shadow on-call, and propose one data-backed improvement (evaluation coverage, a latency hotspot).
+- Days 61–90, own: deliver a meaningful capability (for example an MCP tool integration or an A2A adapter) with tests, docs and dashboards; share what you learned; agree growth goals with your manager.
+
+Emphasise listening before changing things.
+F:
+- What would you want to know on day one?
+- How would you measure your own success after 90 days?
+
+@@ Prototype demo wanted in production in two weeks | Hard | Scenario
+Q: A proof-of-concept agent impressed leadership, and they want it in production in two weeks. What do you do?
+A:
+- Welcome the enthusiasm and make the gap visible: the prototype lacks auth and entitlements, evaluation, error handling, security review, monitoring, runbooks, load testing and data approvals.
+- Offer a phased plan:
+  - Weeks 1–2: a limited pilot (say 50 users) on the paved-road platform (gateway, guardrails, logging), read-only or draft-only actions, human review, a kill switch, basic evaluations and dashboards.
+  - Following weeks: security and model-risk review, scale testing, wider rollout against agreed criteria.
+- Quantify the risks of skipping steps (data leakage, wrong actions, reputational damage).
+- Agree success criteria for each phase with leadership.
+F:
+- What is the minimum you would not compromise on?
+- How do you keep momentum through the reviews?
+
+@@ Onboarding a new model to the platform | Medium | Scenario
+Q: A new frontier model has just launched. How would you add it to a model-agnostic platform?
+A:
+- Approval: vendor and legal terms, data handling, regional availability, model-risk intake.
+- Technical: adapter support (API shape, tool calling, structured output, streaming events, token accounting, error codes) and a capability-registry entry (context window, modalities, reasoning controls, price).
+- Evaluation: the platform suites (task quality, safety and jailbreak resistance, format adherence, latency, cost) compared with the incumbent models, plus per-model prompt tuning.
+- Capacity: quotas or provisioned throughput, rate limits, regional deployments, fallback mapping.
+- Rollout: internal dogfooding → opt-in beta → default for specific routes, with monitoring, docs and release notes.
+F:
+- Which evaluation results would block the rollout?
+- How do you avoid prompt regressions across models?
+
+@@ Primary model endpoint failing | Medium | Scenario
+Q: The primary model endpoint starts failing during London business hours. Walk me through your response.
+A:
+- Detect and declare: alerts on error rate and latency; open an incident and assign roles (incident commander, communications, operations).
+- Assess: scope (one deployment, region or model?), error type (5xx, 429 quota, timeouts, content-filter changes), recent changes (deploys, config, the provider status page).
+- Mitigate fast: fail over to a secondary deployment, region or provider through routing config; shed non-critical traffic such as batch jobs; enable a degraded mode; show a banner or status-page notice.
+- Communicate: regular stakeholder updates and a ticket with the provider.
+- Recover and learn: verify, unwind mitigations gradually, run a postmortem, and improve automatic failover, runbooks and quota headroom.
+F:
+- How should automatic failover decide to trigger?
+- What are the risks of failing over to a different model?
+
+@@ Inheriting a flaky untested service | Medium | Scenario
+Q: You inherit a critical service that is flaky and has almost no tests. What do you do?
+A:
+- Stabilise first: add observability (logs, metrics, traces), find the top failure modes from past incidents, and take quick wins (timeouts, retries, resource limits).
+- Build a safety net: characterisation tests that pin current behaviour where you will make changes, contract tests for the APIs, and a CI pipeline with linting and type checks.
+- Improve incrementally: refactor behind the tests (strangler approach) and fix root causes in order of impact.
+- Document: runbooks, architecture notes, ownership.
+- Share a plan and progress metrics: incident count, MTTR, test coverage on critical paths.
+
+Avoid a big-bang rewrite.
+F:
+- When would you consider a rewrite?
+- What are characterisation tests?
+
+@@ Two teams want conflicting platform changes | Medium | Scenario
+Q: Two client teams want conflicting changes to a shared platform API. How do you resolve it?
+A:
+- Understand each need as a problem rather than a solution, with its impact, urgency and usage data.
+- Look for a design that serves both: configuration options, versioned endpoints, extension points, per-tenant feature flags.
+- If a trade-off is unavoidable, make it explicit against criteria (firm priorities, users affected, risk) and have the product owner and leads decide.
+- Communicate the decision, rationale and timeline to both teams, and offer the deprioritised team a workaround.
+- Protect platform coherence by avoiding one-off hacks.
+F:
+- How do you stop a platform becoming a pile of special cases?
+- What if both teams escalate to their managing directors?
+
+@@ Estimating AI work with uncertain feasibility | Medium | Delivery
+Q: How do you estimate and plan an AI feature when you don't yet know whether the model can do the task well enough?
+A:
+- Separate feasibility from delivery: a timeboxed spike (one or two weeks) that builds an evaluation set and a quick baseline (prompting, RAG) against explicit go/no-go criteria.
+- Estimate the engineering (APIs, integration, security, UI) conventionally, and plan the quality work as iterations with checkpoints.
+- Communicate ranges and assumptions, and show the quality curve after each iteration.
+- Plan fallbacks: narrower scope, human review, or a non-AI alternative.
+- Re-estimate at every checkpoint.
+F:
+- What would your go/no-go criteria look like?
+- How do you communicate uncertainty to executives?
+
+@@ Handling scope creep | Easy | Delivery
+Q: How do you handle scope creep during a project?
+A:
+- Anchor on the goals, success metrics and non-goals written down at the start.
+- When new asks arrive: acknowledge them, assess the impact on time and risk, and present options (swap something out, move the date, defer to a later phase).
+- Make the decision explicit with the product owner, then update and communicate the plan.
+- Keep a backlog of deferred ideas so stakeholders feel heard.
+- In AI projects, creep often looks like "just add one more tool or data source". Check the impact on quality as well as effort.
+F:
+- Give an example where you accepted scope creep, and why.
+- How do you say no to your manager's manager?
+
+@@ Your approach to code reviews | Medium | Engineering practice
+Q: How do you approach code reviews, as a reviewer and as an author?
+A:
+As reviewer:
+
+- Correctness first (logic, edge cases, error handling, concurrency), then security (injection, secrets, authorisation, input validation, PII in logs), then design and maintainability, tests and performance. Leave style to linters.
+- Be specific and kind, explain why, separate blocking issues from nits, and review promptly.
+
+As author:
+
+- Small, focused PRs with context (what, why, how it was tested), a self-review first, linked tickets, and open responses to feedback.
+
+JPMorganChase loops often include a code-review exercise, so practise saying your checklist out loud: bugs, security (hard-coded credentials), naming, tests, logging, resource handling.
+F:
+- What do you look at first in a PR?
+- How do you handle a reviewer who blocks on style preferences?
+
+@@ Production-ready for an agentic capability | Hard | Engineering practice
+Q: What is your definition of "production-ready" for an agentic capability?
+A:
+- Quality: an evaluation suite (task success, tool-call accuracy, safety) that meets agreed thresholds, with regression tests in CI.
+- Safety and security: least-privilege tools, user-delegated auth, approval before side effects, prompt-injection mitigations, output validation, red-team findings addressed, data classification approved.
+- Reliability: timeouts, retries, idempotency, step and cost limits, durable state (checkpointing), graceful degradation, load testing.
+- Observability: traces of every step and tool call; metrics for latency, cost, errors and safety flags; dashboards, alerts and audit logs.
+- Operations: runbooks, named on-call owners, a kill switch, rollback for prompts, models and code.
+- Governance: documentation, model-risk sign-off where required, user guidance.
+F:
+- Which of these do teams skip most often?
+- How do you test an agent's behaviour under failure?
+
+@@ How you document your work | Easy | Engineering practice
+Q: How do you document the systems you build?
+A:
+- README: purpose, quick start, how to run tests and deploy.
+- Architecture overview: diagram, key flows, dependencies, data classification.
+- ADRs: each decision with context, options and consequences.
+- API docs: OpenAPI generated from FastAPI, with examples and error codes.
+- Runbooks: alert → diagnosis → mitigation steps → escalation contacts.
+- Prompt and model cards: versions, intended use, evaluation results, limitations.
+- Keep docs next to the code, review them in PRs, and delete stale ones.
+F:
+- How do you keep documentation current?
+- What makes a runbook useful at 3 a.m.?
+
+@@ Rolling out an agent feature to 50,000 users | Hard | Scenario
+Q: How would you roll out a new agent feature to 50,000 employees safely?
+A:
+- Readiness: evaluations pass, load tests at the expected concurrency (streams and tool calls), quota or provisioned capacity reserved, security sign-off.
+- Staged rollout: dogfood → 1% → 10% → 50% → 100%, each step gated on error rate, latency, cost, safety flags and feedback, with flags per cohort or business unit.
+- Guardrails: per-user rate limits, cost caps, a kill switch, fallback to the non-agent path.
+- Monitoring: per-cohort dashboards, alert thresholds, on-call cover during rollout windows.
+- Communication: release notes, training material, known limitations, a feedback channel, a briefed support team.
+- After launch: review the metrics, triage feedback, iterate.
+F:
+- Which metric would make you halt the rollout?
+- How do you handle a usage spike on launch day?
+
+@@ On-call and sustainable pace | Easy | Engineering practice
+Q: How do you approach on-call, and how do you keep a sustainable pace?
+A:
+- On-call: know the runbooks, test your access before the shift, acknowledge quickly, follow the incident process, escalate early, write clear handoff notes.
+- Improve the rotation: fix noisy alerts, automate toil, track postmortem actions and pages per shift.
+- Sustainability: protect focus time, make realistic commitments, say so when overloaded, rotate responsibilities, take recovery time after heavy incidents.
+F:
+- What makes an alert actionable?
+- How many pages a week is too many?
+
+@@ Diversity and inclusion in engineering | Easy | Culture
+Q: What does diversity and inclusion mean to you in an engineering team?
+A:
+- Diverse teams build better products, especially AI tools used by hundreds of thousands of very different employees. Different perspectives catch blind spots in bias, accessibility and language.
+- Inclusive habits: make room for quieter voices, accept written async input, rotate presenters, review code fairly, mentor, make decision processes clear.
+- In the product: accessible UIs (WCAG), screen-reader-friendly output, multilingual support, fairness testing.
+- Give one example of something you did, such as a knowledge-sharing series or better onboarding for career changers.
+F:
+- How do you make sure every voice is heard in design reviews?
+- How does inclusion relate to AI fairness?
+
+@@ Recruiter screen logistics | Easy | Recruiter screen
+Q: What is your notice period, what are your compensation expectations, and do you have the right to work in the UK? How do you feel about the office attendance expectations?
+A:
+- Notice period: state it clearly and say whether it is negotiable.
+- Compensation: research the London band for Software Engineer III / Senior Associate (base plus bonus) and give a range based on market data and total compensation. It is fine to ask the recruiter for the band first.
+- Right to work: answer factually (citizenship, settled status, or visa type and whether sponsorship is needed).
+- Office attendance: JPMorganChase publicly moved most hybrid employees back to five days a week in the office from 2025. Confirm the current expectation for this team and that it works for you.
+- Ask about the process: stages, timeline, interviewers, and what to prepare (HackerRank, system design, behavioral).
+F:
+- Which other processes are you in, and at what stage?
+- When could you start?

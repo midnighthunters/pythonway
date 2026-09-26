@@ -1,0 +1,4367 @@
+@@ Valid Parentheses | Easy | Stack
+Q: Given a string of `()[]{}`, return whether every bracket is closed in the correct order.
+
+Example: `"()[]{}"` → `True`, `"([)]"` → `False`
+A:
+Seen in: JPMorgan-tagged list (frequent), and a common warm-up in live rounds.
+
+Approach: push openers onto a stack. A closer must match the top of the stack, and the stack must be empty at the end.
+
+```python
+PAIRS = {")": "(", "]": "[", "}": "{"}
+
+
+def is_valid(s: str) -> bool:
+    stack: list[str] = []
+    for ch in s:
+        if ch in PAIRS:
+            if not stack or stack.pop() != PAIRS[ch]:
+                return False
+        else:
+            stack.append(ch)
+    return not stack
+
+
+assert is_valid("()")
+assert is_valid("()[]{}")
+assert not is_valid("(]")
+assert not is_valid("([)]")
+assert is_valid("{[]}")
+assert not is_valid("(")
+assert not is_valid(")")
+```
+
+Complexity: O(n) time, O(n) space.
+
+Quick exit: an odd-length string can never be valid.
+F:
+- Ignore non-bracket characters, for example to validate brackets in code or JSON.
+- Return the index of the first error, to power an editor diagnostic.
+- Minimum insertions to make the string valid.
+
+@@ Min Stack | Medium | Stack design
+Q: Design a stack with `push`, `pop`, `top` and `get_min`, all in O(1).
+A:
+Approach: store `(value, min_so_far)` pairs, so each entry remembers the minimum at the time it was pushed.
+
+```python
+class MinStack:
+    def __init__(self) -> None:
+        self._data: list[tuple[int, int]] = []
+
+    def push(self, val: int) -> None:
+        current_min = min(val, self._data[-1][1]) if self._data else val
+        self._data.append((val, current_min))
+
+    def pop(self) -> None:
+        self._data.pop()
+
+    def top(self) -> int:
+        return self._data[-1][0]
+
+    def get_min(self) -> int:
+        return self._data[-1][1]
+
+
+s = MinStack()
+s.push(-2)
+s.push(0)
+s.push(-3)
+assert s.get_min() == -3
+s.pop()
+assert s.top() == 0 and s.get_min() == -2
+```
+
+Complexity: O(1) per operation, O(n) space. To save space, use a second stack that only pushes when a new minimum appears (with counts for duplicates).
+F:
+- Max stack with `pop_max` (harder: heap with lazy deletion, or a doubly linked list plus a sorted map).
+- The same idea as a min queue (two min-stacks).
+
+@@ Evaluate Reverse Polish Notation | Medium | Stack
+Q: Evaluate an RPN expression with `+ - * /`. Division truncates toward zero.
+
+Example: `["4","13","5","/","+"]` → `6`
+A:
+Approach: push numbers. On an operator, pop the right operand and then the left, apply the operator, and push the result.
+
+Python gotcha: `//` floors toward negative infinity (`-7 // 2 == -4`), so write an explicit truncating division. Avoid `int(a / b)`, which goes through a float and loses precision for large values.
+
+```python
+import operator
+
+
+def trunc_div(a: int, b: int) -> int:
+    q = abs(a) // abs(b)
+    return q if (a < 0) == (b < 0) else -q
+
+
+OPS = {"+": operator.add, "-": operator.sub, "*": operator.mul, "/": trunc_div}
+
+
+def eval_rpn(tokens: list[str]) -> int:
+    stack: list[int] = []
+    for tok in tokens:
+        if tok in OPS:
+            right, left = stack.pop(), stack.pop()
+            stack.append(OPS[tok](left, right))
+        else:
+            stack.append(int(tok))
+    return stack[0]
+
+
+assert eval_rpn(["2", "1", "+", "3", "*"]) == 9
+assert eval_rpn(["4", "13", "5", "/", "+"]) == 6
+assert eval_rpn(["10", "6", "9", "3", "+", "-11", "*", "/", "*", "17", "+", "5", "+"]) == 22
+assert trunc_div(-7, 2) == -3
+```
+
+Complexity: O(n).
+
+Security note: never `eval()` user-supplied expressions. A dispatch table like `OPS` is the safe pattern (and the same one a tool-calling agent uses).
+F:
+- Convert infix to RPN (shunting-yard).
+- Validate malformed input (too few operands, leftover values).
+
+@@ Basic Calculator II | Medium | Stack
+Q: Evaluate a string with non-negative integers, `+ - * /` and spaces (no parentheses). Division truncates toward zero.
+
+Example: `"3+2*2"` → `7`, `" 3+5 / 2 "` → `5`
+A:
+Approach: remember the previous operator. `+` and `-` push `±num`. `*` and `/` combine immediately with the top of the stack, which handles precedence. The answer is the sum of the stack.
+
+```python
+def trunc_div(a: int, b: int) -> int:
+    q = abs(a) // abs(b)
+    return q if (a < 0) == (b < 0) else -q
+
+
+def calculate(s: str) -> int:
+    stack: list[int] = []
+    num, op = 0, "+"
+    for i, ch in enumerate(s):
+        if ch.isdigit():
+            num = num * 10 + int(ch)
+        if ch in "+-*/" or i == len(s) - 1:
+            if op == "+":
+                stack.append(num)
+            elif op == "-":
+                stack.append(-num)
+            elif op == "*":
+                stack.append(stack.pop() * num)
+            else:
+                stack.append(trunc_div(stack.pop(), num))
+            op, num = ch, 0
+    return sum(stack)
+
+
+assert calculate("3+2*2") == 7
+assert calculate(" 3/2 ") == 1
+assert calculate(" 3+5 / 2 ") == 5
+assert calculate("14-3/2") == 13
+assert calculate("42") == 42
+```
+
+Complexity: O(n) time. The running last-term approach cuts space to O(1).
+F:
+- The O(1)-space version (track `result` and `last_term`).
+- Add parentheses (Basic Calculator III: recursion, or a stack of contexts).
+
+@@ Basic Calculator | Hard | Stack of contexts
+Q: Evaluate an expression with `+`, `-`, parentheses, spaces and unary minus.
+
+Example: `"(1+(4+5+2)-3)+(6+8)"` → `23`, `"-(2+3)"` → `-5`
+A:
+Approach: keep a running `result` and the current `sign`. On `(`, push `(result, sign)` and start fresh. On `)`, finish the inner value and combine it with the saved context.
+
+```python
+def calculate_with_parens(s: str) -> int:
+    result, num, sign = 0, 0, 1
+    stack: list[tuple[int, int]] = []
+    for ch in s:
+        if ch.isdigit():
+            num = num * 10 + int(ch)
+        elif ch in "+-":
+            result += sign * num
+            num, sign = 0, (1 if ch == "+" else -1)
+        elif ch == "(":
+            stack.append((result, sign))
+            result, sign = 0, 1
+        elif ch == ")":
+            result += sign * num
+            num = 0
+            prev, prev_sign = stack.pop()
+            result = prev + prev_sign * result
+    return result + sign * num
+
+
+assert calculate_with_parens("1 + 1") == 2
+assert calculate_with_parens(" 2-1 + 2 ") == 3
+assert calculate_with_parens("(1+(4+5+2)-3)+(6+8)") == 23
+assert calculate_with_parens("-(2+3)") == -5
+assert calculate_with_parens("- (3 + (4 + 5))") == -12
+```
+
+Complexity: O(n) time, O(depth) space.
+F:
+- Write a recursive-descent parser with `*` and `/` (expression → term → factor).
+- Reject malformed input with a clear error position.
+
+@@ Decode String | Medium | Stack
+Q: Decode `k[encoded]` patterns, which may be nested.
+
+Example: `"3[a2[c]]"` → `"accaccacc"`
+A:
+Approach: on `[`, push `(current_string, k)` and reset both. On `]`, pop and set `current = prev + current * k`. Repeat counts may have several digits.
+
+```python
+def decode_string(s: str) -> str:
+    stack: list[tuple[str, int]] = []
+    cur, k = "", 0
+    for ch in s:
+        if ch.isdigit():
+            k = k * 10 + int(ch)
+        elif ch == "[":
+            stack.append((cur, k))
+            cur, k = "", 0
+        elif ch == "]":
+            prev, n = stack.pop()
+            cur = prev + cur * n
+        else:
+            cur += ch
+    return cur
+
+
+assert decode_string("3[a]2[bc]") == "aaabcbc"
+assert decode_string("3[a2[c]]") == "accaccacc"
+assert decode_string("2[abc]3[cd]ef") == "abcabccdcdcdef"
+assert decode_string("10[x]") == "x" * 10
+```
+
+Complexity: O(output length).
+
+Production concern: output can grow exponentially with nesting (a "zip bomb"), so enforce a maximum output size on untrusted input.
+F:
+- Encode a string into the shortest `k[...]` form (DP).
+
+@@ Simplify Path | Medium | Stack
+Q: Simplify a Unix absolute path, resolving `.`, `..` and repeated slashes.
+
+Example: `"/home/user/Documents/../Pictures"` → `"/home/user/Pictures"`
+A:
+```python
+def simplify_path(path: str) -> str:
+    stack: list[str] = []
+    for part in path.split("/"):
+        if part in ("", "."):
+            continue
+        if part == "..":
+            if stack:
+                stack.pop()
+        else:
+            stack.append(part)
+    return "/" + "/".join(stack)
+
+
+assert simplify_path("/home/") == "/home"
+assert simplify_path("/home//foo/") == "/home/foo"
+assert simplify_path("/home/user/Documents/../Pictures") == "/home/user/Pictures"
+assert simplify_path("/../") == "/"
+assert simplify_path("/.../a/../b/c/../d/./") == "/.../b/d"
+```
+
+Complexity: O(n).
+
+Security angle: normalising a path is the first step in preventing path traversal. A tool or MCP file server must also check that the resolved path stays inside an allowed root (`Path.resolve()` plus `is_relative_to`), and must consider symlinks.
+F:
+- Implement a safe `open_in_sandbox(root, user_path)`.
+
+@@ Daily Temperatures | Medium | Monotonic stack
+Q: For each day, return how many days you must wait for a warmer temperature, or 0 if none comes.
+
+Example: `[73,74,75,71,69,72,76,73]` → `[1,1,4,2,1,1,0,0]`
+A:
+Approach: keep a stack of indices with decreasing temperatures. A warmer day resolves every colder index on the stack.
+
+```python
+def daily_temperatures(temps: list[int]) -> list[int]:
+    out = [0] * len(temps)
+    stack: list[int] = []
+    for i, t in enumerate(temps):
+        while stack and temps[stack[-1]] < t:
+            j = stack.pop()
+            out[j] = i - j
+        stack.append(i)
+    return out
+
+
+assert daily_temperatures([73, 74, 75, 71, 69, 72, 76, 73]) == [1, 1, 4, 2, 1, 1, 0, 0]
+assert daily_temperatures([30, 40, 50, 60]) == [1, 1, 1, 0]
+assert daily_temperatures([30, 60, 90]) == [1, 1, 0]
+```
+
+Complexity: O(n), since each index is pushed and popped once.
+F:
+- Days until the price next drops below today's (the same pattern, reversed comparison).
+
+@@ Next Greater Element I | Easy | Monotonic stack
+Q: `nums1` is a subset of `nums2`. For each x in `nums1`, return the next greater element to the right of x in `nums2`, or -1.
+
+Example: `[4,1,2], [1,3,4,2]` → `[-1,3,-1]`
+A:
+```python
+def next_greater_element(nums1: list[int], nums2: list[int]) -> list[int]:
+    nxt: dict[int, int] = {}
+    stack: list[int] = []
+    for x in nums2:
+        while stack and stack[-1] < x:
+            nxt[stack.pop()] = x
+        stack.append(x)
+    return [nxt.get(x, -1) for x in nums1]
+
+
+assert next_greater_element([4, 1, 2], [1, 3, 4, 2]) == [-1, 3, -1]
+assert next_greater_element([2, 4], [1, 2, 3, 4]) == [3, -1]
+```
+
+Complexity: O(n + m).
+F:
+- Values are not unique (map indices instead of values).
+
+@@ Next Greater Element II | Medium | Monotonic stack circular
+Q: The array is circular. Return the next greater element for each index, or -1.
+
+Example: `[1,2,1]` → `[2,-1,2]`
+A:
+Approach: iterate `2n` times using `i % n`, so elements at the end can find greater elements at the start. Push indices only during the first pass.
+
+```python
+def next_greater_elements(nums: list[int]) -> list[int]:
+    n = len(nums)
+    out = [-1] * n
+    stack: list[int] = []
+    for i in range(2 * n):
+        x = nums[i % n]
+        while stack and nums[stack[-1]] < x:
+            out[stack.pop()] = x
+        if i < n:
+            stack.append(i)
+    return out
+
+
+assert next_greater_elements([1, 2, 1]) == [2, -1, 2]
+assert next_greater_elements([1, 2, 3, 4, 3]) == [2, 3, 4, -1, 4]
+assert next_greater_elements([]) == []
+```
+
+Complexity: O(n).
+F:
+- Why are two passes enough?
+
+@@ Largest Rectangle in Histogram | Hard | Monotonic stack
+Q: Return the area of the largest rectangle in a histogram.
+
+Example: `[2,1,5,6,2,3]` → `10`
+A:
+Approach: keep a stack of `(start_index, height)` with increasing heights. When a lower bar arrives, pop taller bars and compute their areas. The popped bar extends from its start to the current index. The new bar inherits the earliest start popped. A trailing 0 flushes the stack.
+
+```python
+def largest_rectangle_area(heights: list[int]) -> int:
+    stack: list[tuple[int, int]] = []
+    best = 0
+    for i, h in enumerate([*heights, 0]):
+        start = i
+        while stack and stack[-1][1] >= h:
+            idx, height = stack.pop()
+            best = max(best, height * (i - idx))
+            start = idx
+        stack.append((start, h))
+    return best
+
+
+assert largest_rectangle_area([2, 1, 5, 6, 2, 3]) == 10
+assert largest_rectangle_area([2, 4]) == 4
+assert largest_rectangle_area([]) == 0
+assert largest_rectangle_area([1, 1, 1, 1]) == 4
+```
+
+Complexity: O(n).
+F:
+- Maximal Rectangle in a binary matrix (apply this to each row's heights).
+
+@@ Maximal Rectangle | Hard | Histogram per row
+Q: In a binary matrix of `"0"`/`"1"`, return the area of the largest rectangle containing only 1s.
+A:
+Approach: build a histogram per row, where `heights[c]` is the number of consecutive 1s ending at this row. Run the largest-rectangle algorithm on each row.
+
+```python
+def maximal_rectangle(matrix: list[list[str]]) -> int:
+    if not matrix:
+        return 0
+
+    def largest(heights: list[int]) -> int:
+        stack: list[tuple[int, int]] = []
+        best = 0
+        for i, h in enumerate([*heights, 0]):
+            start = i
+            while stack and stack[-1][1] >= h:
+                idx, height = stack.pop()
+                best = max(best, height * (i - idx))
+                start = idx
+            stack.append((start, h))
+        return best
+
+    heights = [0] * len(matrix[0])
+    best = 0
+    for row in matrix:
+        heights = [h + 1 if v == "1" else 0 for h, v in zip(heights, row)]
+        best = max(best, largest(heights))
+    return best
+
+
+m = [["1", "0", "1", "0", "0"], ["1", "0", "1", "1", "1"], ["1", "1", "1", "1", "1"], ["1", "0", "0", "1", "0"]]
+assert maximal_rectangle(m) == 6
+assert maximal_rectangle([["0"]]) == 0
+assert maximal_rectangle([["1"]]) == 1
+```
+
+Complexity: O(rows × cols).
+F:
+- Maximal Square (a simpler DP). Why is the square easier?
+
+@@ Online Stock Span | Medium | Monotonic stack
+Q: Design `next(price)`, which returns the span: the number of consecutive days, ending today, with price ≤ today's price.
+
+Example: `100,80,60,70,60,75,85` → `1,1,1,2,1,4,6`
+A:
+Approach: a stack of `(price, span)`. Pop every entry with price ≤ today's and add its span to today's.
+
+```python
+class StockSpanner:
+    def __init__(self) -> None:
+        self._stack: list[tuple[int, int]] = []
+
+    def next(self, price: int) -> int:
+        span = 1
+        while self._stack and self._stack[-1][0] <= price:
+            span += self._stack.pop()[1]
+        self._stack.append((price, span))
+        return span
+
+
+sp = StockSpanner()
+assert [sp.next(p) for p in (100, 80, 60, 70, 60, 75, 85)] == [1, 1, 1, 2, 1, 4, 6]
+```
+
+Complexity: O(1) amortised per call.
+F:
+- A monotonic stack in a trading context: "days since the last higher close".
+
+@@ Remove K Digits | Medium | Monotonic stack greedy
+Q: Remove `k` digits from `num` to make the smallest possible number, and return it as a string.
+
+Example: `"1432219", 3` → `"1219"`
+A:
+Approach: greedy with a monotonic increasing stack. Pop larger previous digits while removals remain, because a smaller digit earlier always wins. Then trim any remaining k from the end and strip leading zeros.
+
+```python
+def remove_k_digits(num: str, k: int) -> str:
+    stack: list[str] = []
+    for d in num:
+        while k and stack and stack[-1] > d:
+            stack.pop()
+            k -= 1
+        stack.append(d)
+    if k:
+        stack = stack[:-k]
+    return "".join(stack).lstrip("0") or "0"
+
+
+assert remove_k_digits("1432219", 3) == "1219"
+assert remove_k_digits("10200", 1) == "200"
+assert remove_k_digits("10", 2) == "0"
+assert remove_k_digits("12345", 2) == "123"
+```
+
+Complexity: O(n).
+F:
+- The largest number instead.
+- Create Maximum Number from two arrays (harder).
+
+@@ Remove Duplicate Letters | Medium | Monotonic stack greedy
+Q: Remove duplicate letters so each appears once and the result is the lexicographically smallest possible.
+
+Example: `"cbacdcbc"` → `"acdb"`
+A:
+Approach: a monotonic stack plus the last index of each letter. Pop a larger letter from the top only if it appears again later. Skip letters already in the stack.
+
+```python
+def remove_duplicate_letters(s: str) -> str:
+    last = {c: i for i, c in enumerate(s)}
+    stack: list[str] = []
+    in_stack: set[str] = set()
+    for i, c in enumerate(s):
+        if c in in_stack:
+            continue
+        while stack and stack[-1] > c and last[stack[-1]] > i:
+            in_stack.remove(stack.pop())
+        stack.append(c)
+        in_stack.add(c)
+    return "".join(stack)
+
+
+assert remove_duplicate_letters("bcabc") == "abc"
+assert remove_duplicate_letters("cbacdcbc") == "acdb"
+assert remove_duplicate_letters("aaa") == "a"
+```
+
+Complexity: O(n) time, O(alphabet) space.
+F:
+- Why does the "appears later" check make the greedy choice safe?
+
+@@ Asteroid Collision | Medium | Stack simulation
+Q: Positive values move right and negative values move left. When two meet, the smaller one explodes (both explode if equal). Return the final state.
+
+Example: `[10,2,-5]` → `[10]`, `[8,-8]` → `[]`
+A:
+Approach: a stack. A collision only happens when the top of the stack moves right and the incoming asteroid moves left.
+
+```python
+def asteroid_collision(asteroids: list[int]) -> list[int]:
+    stack: list[int] = []
+    for a in asteroids:
+        alive = True
+        while alive and a < 0 and stack and stack[-1] > 0:
+            if stack[-1] < -a:
+                stack.pop()
+                continue
+            if stack[-1] == -a:
+                stack.pop()
+            alive = False
+        if alive:
+            stack.append(a)
+    return stack
+
+
+assert asteroid_collision([5, 10, -5]) == [5, 10]
+assert asteroid_collision([8, -8]) == []
+assert asteroid_collision([10, 2, -5]) == [10]
+assert asteroid_collision([-2, -1, 1, 2]) == [-2, -1, 1, 2]
+```
+
+Complexity: O(n).
+F:
+- Asteroids have different speeds (event simulation with a priority queue).
+
+@@ Car Fleet | Medium | Sorting and stack
+Q: Cars drive toward `target` and cannot pass each other. A faster car that catches up joins the slower car's fleet. Return the number of fleets that arrive.
+
+Example: `target 12, pos [10,8,0,5,3], speed [2,4,1,1,3]` → `3`
+A:
+Approach: sort by position, closest to the target first, and compute each car's arrival time. A car that would arrive no later than the fleet ahead of it merges into that fleet. Otherwise it starts a new, slower fleet.
+
+```python
+from fractions import Fraction
+
+
+def car_fleet(target: int, position: list[int], speed: list[int]) -> int:
+    fleets, slowest = 0, Fraction(-1)
+    for p, s in sorted(zip(position, speed), reverse=True):
+        t = Fraction(target - p, s)
+        if t > slowest:
+            fleets += 1
+            slowest = t
+    return fleets
+
+
+assert car_fleet(12, [10, 8, 0, 5, 3], [2, 4, 1, 1, 3]) == 3
+assert car_fleet(10, [3], [3]) == 1
+assert car_fleet(100, [0, 2, 4], [4, 2, 1]) == 1
+```
+
+Complexity: O(n log n).
+
+`Fraction` keeps the time comparison exact. Floats are usually fine here, but mention the risk.
+F:
+- Car Fleet II: the time at which each car collides (monotonic stack from the right).
+
+@@ Minimum Remove to Make Valid Parentheses | Medium | Stack
+Q: Remove the minimum number of parentheses so the string becomes valid, and return any valid result.
+
+Example: `"lee(t(c)o)de)"` → `"lee(t(c)o)de"`
+A:
+Approach: first pass, a stack of the indices of unmatched `(` plus a set of unmatched `)`. Drop both kinds.
+
+```python
+def min_remove_to_make_valid(s: str) -> str:
+    stack: list[int] = []
+    drop: set[int] = set()
+    for i, ch in enumerate(s):
+        if ch == "(":
+            stack.append(i)
+        elif ch == ")":
+            if stack:
+                stack.pop()
+            else:
+                drop.add(i)
+    drop.update(stack)
+    return "".join(ch for i, ch in enumerate(s) if i not in drop)
+
+
+assert min_remove_to_make_valid("lee(t(c)o)de)") == "lee(t(c)o)de"
+assert min_remove_to_make_valid("a)b(c)d") == "ab(c)d"
+assert min_remove_to_make_valid("))((") == ""
+```
+
+Complexity: O(n).
+F:
+- Return all valid strings with minimum removals (BFS or backtracking: Remove Invalid Parentheses).
+
+@@ Longest Valid Parentheses | Hard | Stack of indices
+Q: Return the length of the longest valid (well-formed) parentheses substring.
+
+Example: `")()())"` → `4`
+A:
+Approach: a stack of indices seeded with -1 as a base. Push `(`. For `)`, pop. If the stack is now empty, push the current index as the new base. Otherwise the valid length is `i - stack[-1]`.
+
+```python
+def longest_valid_parentheses(s: str) -> int:
+    stack, best = [-1], 0
+    for i, ch in enumerate(s):
+        if ch == "(":
+            stack.append(i)
+        else:
+            stack.pop()
+            if not stack:
+                stack.append(i)
+            else:
+                best = max(best, i - stack[-1])
+    return best
+
+
+assert longest_valid_parentheses("(()") == 2
+assert longest_valid_parentheses(")()())") == 4
+assert longest_valid_parentheses("") == 0
+assert longest_valid_parentheses("()(()") == 2
+assert longest_valid_parentheses("()(())") == 6
+```
+
+Complexity: O(n) time. A two-pass counter version uses O(1) space.
+F:
+- The O(1)-space left/right counter scan.
+
+@@ Valid Parenthesis String | Medium | Greedy range
+Q: `*` can be `(`, `)` or empty. Return whether the string can be valid.
+
+Example: `"(*))"` → `True`
+A:
+Seen in: JPMorgan-tagged list.
+
+Approach: track the range `[lo, hi]` of possible open counts. `(` raises both, `)` lowers both, and `*` widens the range. Fail if `hi < 0`, clamp `lo` at 0, and the string is valid if `lo == 0` at the end.
+
+```python
+def check_valid_string(s: str) -> bool:
+    lo = hi = 0
+    for ch in s:
+        if ch == "(":
+            lo, hi = lo + 1, hi + 1
+        elif ch == ")":
+            lo, hi = lo - 1, hi - 1
+        else:
+            lo, hi = lo - 1, hi + 1
+        if hi < 0:
+            return False
+        lo = max(lo, 0)
+    return lo == 0
+
+
+assert check_valid_string("()")
+assert check_valid_string("(*)")
+assert check_valid_string("(*))")
+assert not check_valid_string("((*")
+assert not check_valid_string(")(")
+```
+
+Complexity: O(n) time, O(1) space. The alternatives are a DP in O(n³) or two stacks in O(n).
+F:
+- The two-stack solution, and why it pairs `*` with the latest `(`.
+
+@@ Score of Parentheses | Medium | Depth counting
+Q: `()` scores 1, `AB` scores A + B, and `(A)` scores 2A. Score a balanced string.
+
+Example: `"(()(()))"` → `6`
+A:
+Approach: only the innermost `()` pairs contribute, each worth `2^depth`. Add `1 << depth` whenever `)` directly follows `(`.
+
+```python
+def score_of_parentheses(s: str) -> int:
+    score = depth = 0
+    for i, ch in enumerate(s):
+        if ch == "(":
+            depth += 1
+        else:
+            depth -= 1
+            if s[i - 1] == "(":
+                score += 1 << depth
+    return score
+
+
+assert score_of_parentheses("()") == 1
+assert score_of_parentheses("(())") == 2
+assert score_of_parentheses("()()") == 2
+assert score_of_parentheses("(()(()))") == 6
+```
+
+Complexity: O(n) time, O(1) space. A stack solution is more direct and just as acceptable.
+F:
+- Show the stack version.
+
+@@ Remove All Adjacent Duplicates in String II | Medium | Stack with counts
+Q: Repeatedly remove `k` adjacent equal characters. Return the final string.
+
+Example: `"deeedbbcccbdaa", k = 3` → `"aa"`
+A:
+Approach: a stack of `[char, count]`. Increment the count for a repeated character and pop when it reaches k.
+
+```python
+def remove_duplicates_k(s: str, k: int) -> str:
+    stack: list[list] = []
+    for ch in s:
+        if stack and stack[-1][0] == ch:
+            stack[-1][1] += 1
+            if stack[-1][1] == k:
+                stack.pop()
+        else:
+            stack.append([ch, 1])
+    return "".join(ch * n for ch, n in stack)
+
+
+assert remove_duplicates_k("abcd", 2) == "abcd"
+assert remove_duplicates_k("deeedbbcccbdaa", 3) == "aa"
+assert remove_duplicates_k("pbbcggttciiippooaais", 2) == "ps"
+```
+
+Complexity: O(n).
+F:
+- The k = 2 version with a plain character stack.
+
+@@ Sum of Subarray Minimums | Medium | Monotonic stack contribution
+Q: Return the sum of `min(subarray)` over all contiguous subarrays, modulo 10^9+7.
+
+Example: `[3,1,2,4]` → `17`
+A:
+Approach: count contributions. `arr[i]` is the minimum of `left[i] * right[i]` subarrays, where `left` counts back to the previous element ≤ it and `right` counts forward to the next element strictly less than it. The asymmetry (≤ on one side, < on the other) prevents double counting ties.
+
+```python
+import random
+
+
+def sum_subarray_mins(arr: list[int]) -> int:
+    n = len(arr)
+    left, right, st = [0] * n, [0] * n, []
+    for i in range(n):
+        while st and arr[st[-1]] > arr[i]:
+            st.pop()
+        left[i] = i - (st[-1] if st else -1)
+        st.append(i)
+    st = []
+    for i in range(n - 1, -1, -1):
+        while st and arr[st[-1]] >= arr[i]:
+            st.pop()
+        right[i] = (st[-1] if st else n) - i
+        st.append(i)
+    return sum(a * l * r for a, l, r in zip(arr, left, right)) % (10**9 + 7)
+
+
+assert sum_subarray_mins([3, 1, 2, 4]) == 17
+assert sum_subarray_mins([11, 81, 94, 43, 3]) == 444
+rng = random.Random(1)
+for _ in range(50):
+    xs = [rng.randint(1, 5) for _ in range(12)]
+    brute = sum(min(xs[i:j]) for i in range(len(xs)) for j in range(i + 1, len(xs) + 1))
+    assert sum_subarray_mins(xs) == brute
+```
+
+Complexity: O(n).
+F:
+- Sum of subarray ranges (max - min) using the same technique twice.
+
+@@ 132 Pattern | Medium | Monotonic stack
+Q: Return whether there exist `i < j < k` with `nums[i] < nums[k] < nums[j]`.
+
+Example: `[3,1,4,2]` → `True`
+A:
+Approach: scan from the right with a decreasing stack. When popping smaller values, the largest popped becomes the best candidate for the "2" (`third`). Any later-scanned (earlier-index) value below `third` completes the pattern.
+
+```python
+def find_132_pattern(nums: list[int]) -> bool:
+    stack: list[int] = []
+    third = float("-inf")
+    for x in reversed(nums):
+        if x < third:
+            return True
+        while stack and stack[-1] < x:
+            third = stack.pop()
+        stack.append(x)
+    return False
+
+
+assert not find_132_pattern([1, 2, 3, 4])
+assert find_132_pattern([3, 1, 4, 2])
+assert find_132_pattern([-1, 3, 2, 0])
+assert not find_132_pattern([1, 0, 1, -4, -3])
+```
+
+Complexity: O(n).
+F:
+- Return the indices of one such triple.
+
+@@ Exclusive Time of Functions | Medium | Stack of calls
+Q: On a single-threaded CPU, logs look like `"id:start:ts"` or `"id:end:ts"`, where an end timestamp is inclusive. Return each function's exclusive running time.
+
+Example: `n=2, ["0:start:0","1:start:2","1:end:5","0:end:6"]` → `[3,4]`
+A:
+Why it matters here: this is how profilers and distributed-tracing tools compute self-time for nested spans, for example agent steps and tool calls in LangSmith or OpenTelemetry traces.
+
+Approach: a call stack plus `prev`, the start of the current slice. On start, credit the running function with `ts - prev`. On end, credit the popped function with `ts - prev + 1` and set `prev = ts + 1`.
+
+```python
+def exclusive_time(n: int, logs: list[str]) -> list[int]:
+    res = [0] * n
+    stack: list[int] = []
+    prev = 0
+    for log in logs:
+        fid_s, kind, ts_s = log.split(":")
+        fid, ts = int(fid_s), int(ts_s)
+        if kind == "start":
+            if stack:
+                res[stack[-1]] += ts - prev
+            stack.append(fid)
+            prev = ts
+        else:
+            res[stack.pop()] += ts - prev + 1
+            prev = ts + 1
+    return res
+
+
+assert exclusive_time(2, ["0:start:0", "1:start:2", "1:end:5", "0:end:6"]) == [3, 4]
+assert exclusive_time(1, ["0:start:0", "0:start:2", "0:end:5", "0:start:6", "0:end:6", "0:end:7"]) == [8]
+```
+
+Complexity: O(number of logs).
+F:
+- Spans with half-open, millisecond timestamps (no +1).
+- Concurrent async spans, where there is no single stack (build a tree from parent span IDs).
+
+@@ Validate Stack Sequences | Medium | Stack simulation
+Q: Given `pushed` and `popped` (distinct values), return whether they could be the push and pop sequences of a single stack.
+
+Example: `[1,2,3,4,5], [4,5,3,2,1]` → `True`
+A:
+Approach: simulate. Push each value, then pop greedily while the top matches the next expected pop.
+
+```python
+def validate_stack_sequences(pushed: list[int], popped: list[int]) -> bool:
+    stack: list[int] = []
+    j = 0
+    for x in pushed:
+        stack.append(x)
+        while stack and j < len(popped) and stack[-1] == popped[j]:
+            stack.pop()
+            j += 1
+    return j == len(popped)
+
+
+assert validate_stack_sequences([1, 2, 3, 4, 5], [4, 5, 3, 2, 1])
+assert not validate_stack_sequences([1, 2, 3, 4, 5], [4, 3, 5, 1, 2])
+assert validate_stack_sequences([], [])
+```
+
+Complexity: O(n).
+F:
+- Why is greedy popping always safe?
+
+@@ Implement Queue using Stacks | Easy | Amortized design
+Q: Implement a FIFO queue using only two stacks, with `push`, `pop`, `peek` and `empty`.
+A:
+Approach: push onto an `inbox` stack. When `outbox` is empty, pour the inbox into it, which reverses the order. Each element moves at most once, so every operation is amortised O(1).
+
+```python
+class MyQueue:
+    def __init__(self) -> None:
+        self._in: list[int] = []
+        self._out: list[int] = []
+
+    def push(self, x: int) -> None:
+        self._in.append(x)
+
+    def _shift(self) -> None:
+        if not self._out:
+            while self._in:
+                self._out.append(self._in.pop())
+
+    def pop(self) -> int:
+        self._shift()
+        return self._out.pop()
+
+    def peek(self) -> int:
+        self._shift()
+        return self._out[-1]
+
+    def empty(self) -> bool:
+        return not self._in and not self._out
+
+
+q = MyQueue()
+q.push(1)
+q.push(2)
+assert q.peek() == 1 and q.pop() == 1
+q.push(3)
+assert q.pop() == 2 and q.pop() == 3 and q.empty()
+```
+
+Complexity: O(1) amortised per operation. In real code, use `collections.deque`.
+F:
+- Explain the amortised argument (the potential method).
+
+@@ Implement Stack using Queues | Easy | Queue rotation
+Q: Implement a LIFO stack using a single queue.
+A:
+Approach: after enqueueing x, rotate the previous n-1 elements behind it so x sits at the front. Push is O(n) and pop is O(1).
+
+```python
+from collections import deque
+
+
+class MyStack:
+    def __init__(self) -> None:
+        self._q: deque[int] = deque()
+
+    def push(self, x: int) -> None:
+        self._q.append(x)
+        for _ in range(len(self._q) - 1):
+            self._q.append(self._q.popleft())
+
+    def pop(self) -> int:
+        return self._q.popleft()
+
+    def top(self) -> int:
+        return self._q[0]
+
+    def empty(self) -> bool:
+        return not self._q
+
+
+s = MyStack()
+s.push(1)
+s.push(2)
+assert s.top() == 2 and s.pop() == 2 and not s.empty() and s.pop() == 1 and s.empty()
+```
+
+Complexity: push O(n), pop and top O(1).
+F:
+- Which operation would you make expensive if pops dominate?
+
+@@ Baseball Game | Easy | Stack
+Q: Process operations: an integer records a score, `+` records the sum of the last two, `D` records double the last, and `C` removes the last. Return the total.
+
+Example: `["5","2","C","D","+"]` → `30`
+A:
+```python
+def cal_points(operations: list[str]) -> int:
+    stack: list[int] = []
+    for op in operations:
+        if op == "+":
+            stack.append(stack[-1] + stack[-2])
+        elif op == "D":
+            stack.append(2 * stack[-1])
+        elif op == "C":
+            stack.pop()
+        else:
+            stack.append(int(op))
+    return sum(stack)
+
+
+assert cal_points(["5", "2", "C", "D", "+"]) == 30
+assert cal_points(["5", "-2", "4", "C", "D", "9", "+", "+"]) == 27
+assert cal_points(["1", "C"]) == 0
+```
+
+Complexity: O(n).
+F:
+- This is an undo log. How would you add "redo"?
+
+@@ Buildings With an Ocean View | Medium | Right-to-left max
+Q: The ocean is to the right. A building has a view if every building to its right is strictly shorter. Return those indices in increasing order.
+
+Example: `[4,2,3,1]` → `[0,2,3]`
+A:
+```python
+def find_buildings(heights: list[int]) -> list[int]:
+    out, tallest = [], 0
+    for i in range(len(heights) - 1, -1, -1):
+        if heights[i] > tallest:
+            out.append(i)
+            tallest = heights[i]
+    return out[::-1]
+
+
+assert find_buildings([4, 2, 3, 1]) == [0, 2, 3]
+assert find_buildings([4, 3, 2, 1]) == [0, 1, 2, 3]
+assert find_buildings([1, 3, 2, 4]) == [3]
+```
+
+Complexity: O(n) time, O(1) extra space. If the input is streamed left to right, use a monotonic stack instead.
+F:
+- The streaming left-to-right version with a stack.
+
+@@ Number of Recent Calls | Easy | Queue window
+Q: `ping(t)` (with t strictly increasing) returns the number of pings in `[t-3000, t]`.
+A:
+Approach: a deque of timestamps. Evict from the front while the timestamp is older than `t - 3000`.
+
+```python
+from collections import deque
+
+
+class RecentCounter:
+    def __init__(self) -> None:
+        self._q: deque[int] = deque()
+
+    def ping(self, t: int) -> int:
+        self._q.append(t)
+        while self._q[0] < t - 3000:
+            self._q.popleft()
+        return len(self._q)
+
+
+rc = RecentCounter()
+assert [rc.ping(t) for t in (1, 100, 3001, 3002)] == [1, 2, 3, 3]
+```
+
+Complexity: amortised O(1) per ping, with memory bounded by the window.
+F:
+- This is a sliding-window rate limiter. How would you share it across several API replicas? (Redis sorted sets.)
+
+@@ Design Circular Queue | Medium | Ring buffer
+Q: Implement a fixed-capacity circular queue with `en_queue`, `de_queue`, `front`, `rear`, `is_empty` and `is_full`.
+A:
+Approach: a fixed array plus a head index and a size. The tail is `(head + size) % k`. Tracking the size avoids the full-versus-empty ambiguity.
+
+```python
+class MyCircularQueue:
+    def __init__(self, k: int) -> None:
+        self._buf = [0] * k
+        self._head = 0
+        self._size = 0
+
+    def en_queue(self, value: int) -> bool:
+        if self.is_full():
+            return False
+        self._buf[(self._head + self._size) % len(self._buf)] = value
+        self._size += 1
+        return True
+
+    def de_queue(self) -> bool:
+        if self.is_empty():
+            return False
+        self._head = (self._head + 1) % len(self._buf)
+        self._size -= 1
+        return True
+
+    def front(self) -> int:
+        return -1 if self.is_empty() else self._buf[self._head]
+
+    def rear(self) -> int:
+        return -1 if self.is_empty() else self._buf[(self._head + self._size - 1) % len(self._buf)]
+
+    def is_empty(self) -> bool:
+        return self._size == 0
+
+    def is_full(self) -> bool:
+        return self._size == len(self._buf)
+
+
+q = MyCircularQueue(3)
+assert [q.en_queue(1), q.en_queue(2), q.en_queue(3), q.en_queue(4)] == [True, True, True, False]
+assert q.rear() == 3 and q.is_full()
+assert q.de_queue() and q.en_queue(4) and q.rear() == 4 and q.front() == 2
+```
+
+Complexity: O(1) per operation, O(k) memory.
+
+Where ring buffers show up: log buffers, audio, and bounded queues between producers and consumers.
+F:
+- Make it thread-safe (a lock plus conditions, or a lock-free single-producer single-consumer design).
+- An overwrite-oldest mode, like a flight recorder.
+
+@@ Design Circular Deque | Medium | Ring buffer
+Q: Implement a fixed-capacity double-ended queue with insert, delete and get at both ends.
+A:
+```python
+class MyCircularDeque:
+    def __init__(self, k: int) -> None:
+        self._buf = [0] * k
+        self._head = 0
+        self._size = 0
+
+    def _idx(self, offset: int) -> int:
+        return (self._head + offset) % len(self._buf)
+
+    def insert_front(self, value: int) -> bool:
+        if self.is_full():
+            return False
+        self._head = self._idx(-1)
+        self._buf[self._head] = value
+        self._size += 1
+        return True
+
+    def insert_last(self, value: int) -> bool:
+        if self.is_full():
+            return False
+        self._buf[self._idx(self._size)] = value
+        self._size += 1
+        return True
+
+    def delete_front(self) -> bool:
+        if self.is_empty():
+            return False
+        self._head = self._idx(1)
+        self._size -= 1
+        return True
+
+    def delete_last(self) -> bool:
+        if self.is_empty():
+            return False
+        self._size -= 1
+        return True
+
+    def get_front(self) -> int:
+        return -1 if self.is_empty() else self._buf[self._head]
+
+    def get_rear(self) -> int:
+        return -1 if self.is_empty() else self._buf[self._idx(self._size - 1)]
+
+    def is_empty(self) -> bool:
+        return self._size == 0
+
+    def is_full(self) -> bool:
+        return self._size == len(self._buf)
+
+
+d = MyCircularDeque(3)
+assert [d.insert_last(1), d.insert_last(2), d.insert_front(3), d.insert_front(4)] == [True, True, True, False]
+assert d.get_rear() == 2 and d.is_full() and d.delete_last() and d.insert_front(4) and d.get_front() == 4
+```
+
+Complexity: O(1) per operation.
+
+Python's `%` returns a non-negative result, so `(head - 1) % k` wraps correctly.
+F:
+- How is `collections.deque` implemented? (A doubly linked list of fixed-size blocks.)
+
+@@ Design Hit Counter | Medium | Queue with compression
+Q: `hit(t)` records a hit at second t, and `get_hits(t)` returns the hits in the past 300 seconds. Timestamps don't decrease.
+A:
+Approach: a deque of `[timestamp, count]` buckets, which merges hits in the same second, plus a running total. Evict buckets older than `t - 300`. A fixed 300-slot circular array is the O(1)-memory alternative.
+
+```python
+from collections import deque
+
+
+class HitCounter:
+    WINDOW = 300
+
+    def __init__(self) -> None:
+        self._q: deque[list[int]] = deque()
+        self._total = 0
+
+    def _evict(self, t: int) -> None:
+        while self._q and self._q[0][0] <= t - self.WINDOW:
+            self._total -= self._q.popleft()[1]
+
+    def hit(self, t: int) -> None:
+        if self._q and self._q[-1][0] == t:
+            self._q[-1][1] += 1
+        else:
+            self._q.append([t, 1])
+        self._total += 1
+        self._evict(t)
+
+    def get_hits(self, t: int) -> int:
+        self._evict(t)
+        return self._total
+
+
+hc = HitCounter()
+for t in (1, 2, 3):
+    hc.hit(t)
+assert hc.get_hits(4) == 3
+hc.hit(300)
+assert hc.get_hits(300) == 4
+assert hc.get_hits(301) == 3
+```
+
+Complexity: O(1) amortised, with memory bounded by the number of distinct seconds in the window.
+F:
+- Millions of hits per second across many servers (per-node counters aggregated centrally, or Redis `INCR` with per-second keys and a TTL).
+
+@@ Logger Rate Limiter | Easy | Hash map
+Q: `should_print(timestamp, message)` returns `True` if the message hasn't been printed in the last 10 seconds.
+A:
+Approach: a dict from message to the next allowed timestamp. Mention unbounded growth, and add periodic cleanup or a TTL cache.
+
+```python
+class Logger:
+    def __init__(self, interval: int = 10) -> None:
+        self._next_allowed: dict[str, int] = {}
+        self._interval = interval
+
+    def should_print(self, timestamp: int, message: str) -> bool:
+        if timestamp < self._next_allowed.get(message, 0):
+            return False
+        self._next_allowed[message] = timestamp + self._interval
+        return True
+
+
+log = Logger()
+calls = [(1, "foo"), (2, "bar"), (3, "foo"), (8, "bar"), (10, "foo"), (11, "foo")]
+assert [log.should_print(t, m) for t, m in calls] == [True, True, False, False, False, True]
+```
+
+Complexity: O(1) per call.
+
+Memory fix: keep a deque of `(expiry, message)` and purge expired keys on each call, or rely on Redis `SET key NX EX 10`.
+F:
+- Alert de-duplication in an on-call system: the same alert suppressed for N minutes.
+
+@@ Task Scheduler | Medium | Greedy counting
+Q: Identical tasks must be at least `n` intervals apart, and idle slots are allowed. Return the minimum total number of intervals.
+
+Example: `["A","A","A","B","B","B"], n = 2` → `8`
+A:
+Approach: the most frequent task defines frames of size n+1. The answer is `max(len(tasks), (max_count - 1) * (n + 1) + count_of_tasks_with_max)`.
+
+```python
+from collections import Counter
+
+
+def least_interval(tasks: list[str], n: int) -> int:
+    counts = Counter(tasks).values()
+    top = max(counts)
+    num_top = sum(1 for c in counts if c == top)
+    return max(len(tasks), (top - 1) * (n + 1) + num_top)
+
+
+assert least_interval(["A", "A", "A", "B", "B", "B"], 2) == 8
+assert least_interval(["A", "A", "A", "B", "B", "B"], 0) == 6
+assert least_interval(["A"] * 6 + list("BCDEFG"), 2) == 16
+```
+
+Complexity: O(n) time.
+
+The simulation with a max-heap plus a cooldown queue is more general and also acceptable. It reconstructs the actual schedule.
+F:
+- Produce the actual schedule.
+- Rate-limited API calls per provider as a scheduling problem.
+
+@@ Dota2 Senate | Medium | Queue simulation
+Q: Senators from parties R and D vote in rounds. Each senator bans the next opposing senator. Predict which party wins.
+
+Example: `"RDD"` → `"Dire"`
+A:
+Approach: two queues of indices. The smaller index acts first, bans the other, and requeues itself at `index + n` for the next round.
+
+```python
+from collections import deque
+
+
+def predict_party_victory(senate: str) -> str:
+    n = len(senate)
+    r = deque(i for i, c in enumerate(senate) if c == "R")
+    d = deque(i for i, c in enumerate(senate) if c == "D")
+    while r and d:
+        a, b = r.popleft(), d.popleft()
+        if a < b:
+            r.append(a + n)
+        else:
+            d.append(b + n)
+    return "Radiant" if r else "Dire"
+
+
+assert predict_party_victory("RD") == "Radiant"
+assert predict_party_victory("RDD") == "Dire"
+assert predict_party_victory("DDRRR") == "Dire"
+```
+
+Complexity: O(n).
+F:
+- Why is banning the next opponent the optimal strategy?
+
+@@ Reveal Cards In Increasing Order | Medium | Deque simulation
+Q: Reorder a deck so that repeatedly revealing the top card and moving the next card to the bottom reveals the cards in increasing order.
+
+Example: `[17,13,11,2,3,5,7]` → `[2,13,3,11,5,17,7]`
+A:
+Approach: simulate the process on positions instead of cards. Assign the sorted cards to the positions in the order they would be revealed.
+
+```python
+from collections import deque
+
+
+def deck_revealed_increasing(deck: list[int]) -> list[int]:
+    positions = deque(range(len(deck)))
+    out = [0] * len(deck)
+    for card in sorted(deck):
+        out[positions.popleft()] = card
+        if positions:
+            positions.append(positions.popleft())
+    return out
+
+
+assert deck_revealed_increasing([17, 13, 11, 2, 3, 5, 7]) == [2, 13, 3, 11, 5, 17, 7]
+assert deck_revealed_increasing([1, 1000]) == [1, 1000]
+```
+
+Complexity: O(n log n).
+F:
+- Verify the output by running the forward simulation.
+
+@@ Time Needed to Buy Tickets | Easy | Counting
+Q: People queue for tickets, taking 1 second per ticket and going to the back if they need more. How long until person k finishes?
+
+Example: `[2,3,2], k = 2` → `6`
+A:
+Approach: everyone at or before k buys up to `tickets[k]`, and everyone after k buys up to `tickets[k] - 1`.
+
+```python
+def time_required_to_buy(tickets: list[int], k: int) -> int:
+    t = tickets[k]
+    return sum(min(x, t) if i <= k else min(x, t - 1) for i, x in enumerate(tickets))
+
+
+assert time_required_to_buy([2, 3, 2], 2) == 6
+assert time_required_to_buy([5, 1, 1, 1], 0) == 8
+```
+
+Complexity: O(n) versus O(n·max) for direct simulation.
+F:
+- Estimate the wait time in a fair round-robin scheduler.
+
+@@ First Unique Number | Medium | Queue with counts
+Q: Design a class initialised with a list, supporting `add(x)` and `show_first_unique()`, which returns the first value that appears exactly once, or -1.
+A:
+Approach: counts plus a queue in insertion order. Lazily pop the front while it is no longer unique. Each value is popped at most once, so this is amortised O(1).
+
+```python
+from collections import Counter, deque
+
+
+class FirstUnique:
+    def __init__(self, nums: list[int]) -> None:
+        self._counts: Counter[int] = Counter()
+        self._q: deque[int] = deque()
+        for x in nums:
+            self.add(x)
+
+    def add(self, x: int) -> None:
+        self._counts[x] += 1
+        if self._counts[x] == 1:
+            self._q.append(x)
+
+    def show_first_unique(self) -> int:
+        while self._q and self._counts[self._q[0]] > 1:
+            self._q.popleft()
+        return self._q[0] if self._q else -1
+
+
+fu = FirstUnique([2, 3, 5])
+assert fu.show_first_unique() == 2
+fu.add(5)
+assert fu.show_first_unique() == 2
+fu.add(2)
+assert fu.show_first_unique() == 3
+fu.add(3)
+assert fu.show_first_unique() == -1
+```
+
+Complexity: amortised O(1) per operation.
+F:
+- The OrderedDict alternative (delete on the second sighting).
+
+@@ Jump Game VI | Medium | DP with monotonic deque
+Q: Start at index 0 and jump 1 to k steps forward each time. Maximise the sum of the values you land on when you reach the last index.
+
+Example: `[1,-1,-2,4,-7,3], k = 2` → `7`
+A:
+Approach: `dp[i] = nums[i] + max(dp[i-k..i-1])`. Keep the window maximum in a decreasing deque of indices.
+
+```python
+from collections import deque
+
+
+def max_result(nums: list[int], k: int) -> int:
+    dp = [0] * len(nums)
+    dp[0] = nums[0]
+    dq: deque[int] = deque([0])
+    for i in range(1, len(nums)):
+        if dq[0] < i - k:
+            dq.popleft()
+        dp[i] = nums[i] + dp[dq[0]]
+        while dq and dp[dq[-1]] <= dp[i]:
+            dq.pop()
+        dq.append(i)
+    return dp[-1]
+
+
+assert max_result([1, -1, -2, 4, -7, 3], 2) == 7
+assert max_result([10, -5, -2, 4, 0, 3], 3) == 17
+assert max_result([1, -5, -20, 4, -1, 3, -6, -3], 2) == 0
+```
+
+Complexity: O(n) versus O(nk) for the naive DP.
+F:
+- Constrained Subsequence Sum (the same trick, but you may start anywhere).
+
+@@ Longest Continuous Subarray With Absolute Diff Less Than or Equal to Limit | Medium | Two monotonic deques
+Q: Return the longest subarray where `max - min ≤ limit`.
+
+Example: `[10,1,2,4,7,2], limit 5` → `4`
+A:
+Approach: a sliding window with a decreasing deque for the maximum and an increasing deque for the minimum. Shrink the window from the left while `max - min > limit`.
+
+```python
+from collections import deque
+
+
+def longest_subarray_within_limit(nums: list[int], limit: int) -> int:
+    maxd: deque[int] = deque()
+    mind: deque[int] = deque()
+    left = best = 0
+    for right, x in enumerate(nums):
+        while maxd and maxd[-1] < x:
+            maxd.pop()
+        maxd.append(x)
+        while mind and mind[-1] > x:
+            mind.pop()
+        mind.append(x)
+        while maxd[0] - mind[0] > limit:
+            if maxd[0] == nums[left]:
+                maxd.popleft()
+            if mind[0] == nums[left]:
+                mind.popleft()
+            left += 1
+        best = max(best, right - left + 1)
+    return best
+
+
+assert longest_subarray_within_limit([8, 2, 4, 7], 4) == 2
+assert longest_subarray_within_limit([10, 1, 2, 4, 7, 2], 5) == 4
+assert longest_subarray_within_limit([4, 2, 2, 2, 4, 4, 2, 2], 0) == 3
+```
+
+Complexity: O(n).
+
+Keeping equal values in the deques (popping only strictly smaller or larger) makes value-based eviction correct with duplicates.
+F:
+- Anomaly detection: the longest stable price period where the price stays within a band.
+
+@@ Reverse Linked List | Easy | Linked list
+Q: Reverse a singly linked list.
+
+Example: `1→2→3→4→5` → `5→4→3→2→1`
+A:
+Approach: iteratively re-point `next` using `prev`, `cur` and `nxt`. The recursive version uses O(n) stack, which risks Python's recursion limit (about 1000 by default).
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def reverse_list(head):
+    prev = None
+    while head:
+        head.next, prev, head = prev, head, head.next
+    return prev
+
+
+def reverse_list_recursive(head):
+    if head is None or head.next is None:
+        return head
+    new_head = reverse_list_recursive(head.next)
+    head.next.next = head
+    head.next = None
+    return new_head
+
+
+assert to_list(reverse_list(build([1, 2, 3, 4, 5]))) == [5, 4, 3, 2, 1]
+assert to_list(reverse_list_recursive(build([1, 2]))) == [2, 1]
+assert reverse_list(None) is None
+```
+
+Complexity: O(n) time, O(1) space iteratively.
+
+Careful with the tuple assignment: Python evaluates the right-hand side first, and the targets are assigned left to right. Writing it as three explicit lines is clearer in an interview.
+F:
+- Reverse in groups of k.
+- Reverse a doubly linked list.
+
+@@ Reverse Linked List II | Medium | Linked list
+Q: Reverse the nodes from position `left` to `right` (1-based) in one pass.
+
+Example: `[1,2,3,4,5], 2, 4` → `[1,4,3,2,5]`
+A:
+Approach: a dummy head, then walk to the node before `left`. Repeatedly move the node after `cur` to the front of the sublist (head insertion).
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def reverse_between(head, left: int, right: int):
+    dummy = ListNode(0, head)
+    prev = dummy
+    for _ in range(left - 1):
+        prev = prev.next
+    cur = prev.next
+    for _ in range(right - left):
+        nxt = cur.next
+        cur.next = nxt.next
+        nxt.next = prev.next
+        prev.next = nxt
+    return dummy.next
+
+
+assert to_list(reverse_between(build([1, 2, 3, 4, 5]), 2, 4)) == [1, 4, 3, 2, 5]
+assert to_list(reverse_between(build([5]), 1, 1)) == [5]
+assert to_list(reverse_between(build([3, 5]), 1, 2)) == [5, 3]
+```
+
+Complexity: O(n) time, O(1) space.
+
+The dummy head removes the special case when `left == 1`.
+F:
+- Why does a dummy node simplify so many linked-list problems?
+
+@@ Merge Two Sorted Lists | Easy | Linked list
+Q: Merge two sorted linked lists into one sorted list by splicing their nodes.
+A:
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def merge_two_lists(a, b):
+    dummy = tail = ListNode()
+    while a and b:
+        if a.val <= b.val:
+            tail.next, a = a, a.next
+        else:
+            tail.next, b = b, b.next
+        tail = tail.next
+    tail.next = a or b
+    return dummy.next
+
+
+assert to_list(merge_two_lists(build([1, 2, 4]), build([1, 3, 4]))) == [1, 1, 2, 3, 4, 4]
+assert to_list(merge_two_lists(None, None)) == []
+assert to_list(merge_two_lists(None, build([0]))) == [0]
+```
+
+Complexity: O(n + m) time, O(1) space.
+F:
+- Merge k lists.
+- Why use `<=` for stability?
+
+@@ Merge k Sorted Lists | Hard | Heap
+Q: Merge k sorted linked lists into one sorted list.
+A:
+Approach: a min-heap holding the head of each list. Push `(val, i, node)`, where `i` is a tie-breaker because `ListNode` objects aren't comparable. The alternative is divide and conquer (pairwise merges), also O(N log k).
+
+```python
+import heapq
+
+
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def merge_k_lists(lists):
+    heap = [(node.val, i, node) for i, node in enumerate(lists) if node]
+    heapq.heapify(heap)
+    dummy = tail = ListNode()
+    while heap:
+        _, i, node = heapq.heappop(heap)
+        tail.next = tail = node
+        if node.next:
+            heapq.heappush(heap, (node.next.val, i, node.next))
+    return dummy.next
+
+
+lists = [build([1, 4, 5]), build([1, 3, 4]), build([2, 6])]
+assert to_list(merge_k_lists(lists)) == [1, 1, 2, 3, 4, 4, 5, 6]
+assert to_list(merge_k_lists([])) == []
+assert to_list(merge_k_lists([None, build([1])])) == [1]
+```
+
+Complexity: O(N log k) time, O(k) heap.
+
+Gotcha: `tail.next = tail = node` assigns left to right, so `tail.next` is set first and then `tail` moves. This is a common Python idiom, but spell it out when explaining.
+F:
+- Merge k sorted log files that don't fit in memory (`heapq.merge` over file iterators).
+- Why include the index in the heap tuple?
+
+@@ Linked List Cycle | Easy | Floyd
+Q: Return whether a linked list has a cycle, using O(1) memory.
+A:
+Approach: tortoise and hare. If a cycle exists, the fast pointer eventually meets the slow one.
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build_with_cycle(vals, pos):
+    nodes = [ListNode(v) for v in vals]
+    for a, b in zip(nodes, nodes[1:]):
+        a.next = b
+    if nodes and pos >= 0:
+        nodes[-1].next = nodes[pos]
+    return nodes[0] if nodes else None
+
+
+def has_cycle(head) -> bool:
+    slow = fast = head
+    while fast and fast.next:
+        slow, fast = slow.next, fast.next.next
+        if slow is fast:
+            return True
+    return False
+
+
+assert has_cycle(build_with_cycle([3, 2, 0, -4], 1))
+assert has_cycle(build_with_cycle([1, 2], 0))
+assert not has_cycle(build_with_cycle([1], -1))
+assert not has_cycle(None)
+```
+
+Complexity: O(n) time, O(1) space. A visited set is O(n) space.
+
+Use `is` for identity. Comparing values would give wrong answers when values repeat.
+F:
+- Find where the cycle begins.
+- Detect cycles in a workflow or agent graph definition (DFS colouring).
+
+@@ Linked List Cycle II | Medium | Floyd
+Q: Return the node where the cycle begins, or `None`.
+A:
+Approach: after slow and fast meet, restart one pointer at the head and move both one step at a time. They meet at the cycle entry, because the distance from the head to the entry equals the distance from the meeting point to the entry, modulo the cycle length.
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build_with_cycle(vals, pos):
+    nodes = [ListNode(v) for v in vals]
+    for a, b in zip(nodes, nodes[1:]):
+        a.next = b
+    if nodes and pos >= 0:
+        nodes[-1].next = nodes[pos]
+    return (nodes[0] if nodes else None), nodes
+
+
+def detect_cycle(head):
+    slow = fast = head
+    while fast and fast.next:
+        slow, fast = slow.next, fast.next.next
+        if slow is fast:
+            slow = head
+            while slow is not fast:
+                slow, fast = slow.next, fast.next
+            return slow
+    return None
+
+
+head, nodes = build_with_cycle([3, 2, 0, -4], 1)
+assert detect_cycle(head) is nodes[1]
+head, nodes = build_with_cycle([1, 2], 0)
+assert detect_cycle(head) is nodes[0]
+head, _ = build_with_cycle([1], -1)
+assert detect_cycle(head) is None
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Derive the distance equation.
+
+@@ Middle of the Linked List | Easy | Fast and slow pointers
+Q: Return the middle node. For an even length, return the second of the two middle nodes.
+A:
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def middle_node(head):
+    slow = fast = head
+    while fast and fast.next:
+        slow, fast = slow.next, fast.next.next
+    return slow
+
+
+assert middle_node(build([1, 2, 3, 4, 5])).val == 3
+assert middle_node(build([1, 2, 3, 4, 5, 6])).val == 4
+assert middle_node(build([1])).val == 1
+```
+
+Complexity: O(n) time, O(1) space.
+
+To get the first middle instead, loop while `fast.next and fast.next.next`.
+F:
+- Where is this used? (Merge sort on lists, palindrome checks, reorder list.)
+
+@@ Remove Nth Node From End of List | Medium | Two pointers
+Q: Remove the n-th node from the end in one pass.
+
+Example: `[1,2,3,4,5], n = 2` → `[1,2,3,5]`
+A:
+Approach: a dummy head. Advance `fast` n+1 steps, then move both pointers until `fast` is `None`. `slow` then sits just before the target.
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def remove_nth_from_end(head, n: int):
+    dummy = ListNode(0, head)
+    slow = fast = dummy
+    for _ in range(n + 1):
+        fast = fast.next
+    while fast:
+        slow, fast = slow.next, fast.next
+    slow.next = slow.next.next
+    return dummy.next
+
+
+assert to_list(remove_nth_from_end(build([1, 2, 3, 4, 5]), 2)) == [1, 2, 3, 5]
+assert to_list(remove_nth_from_end(build([1]), 1)) == []
+assert to_list(remove_nth_from_end(build([1, 2]), 1)) == [1]
+assert to_list(remove_nth_from_end(build([1, 2]), 2)) == [2]
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Validate `n` greater than the length (raise a clear error rather than crashing on `None`).
+
+@@ Palindrome Linked List | Easy | Linked list
+Q: Return whether a singly linked list is a palindrome, in O(n) time and O(1) extra space.
+A:
+Approach: find the middle, reverse the second half, compare the halves, then restore the list, because callers shouldn't see their input mutated.
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def reverse(node):
+    prev = None
+    while node:
+        nxt = node.next
+        node.next = prev
+        prev, node = node, nxt
+    return prev
+
+
+def is_palindrome_list(head) -> bool:
+    slow = fast = head
+    while fast and fast.next:
+        slow, fast = slow.next, fast.next.next
+    second = reverse(slow)
+    a, b, ok = head, second, True
+    while b:
+        if a.val != b.val:
+            ok = False
+            break
+        a, b = a.next, b.next
+    reverse(second)
+    return ok
+
+
+for vals, expected in (([1, 2, 2, 1], True), ([1, 2], False), ([1], True), ([1, 2, 3, 2, 1], True), ([], True)):
+    h = build(vals)
+    assert is_palindrome_list(h) is expected
+    assert to_list(h) == vals
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Why is restoring the list good practice? (Callers own their data, and concurrent readers may be affected.)
+
+@@ Intersection of Two Linked Lists | Easy | Two pointers
+Q: Return the node where two singly linked lists intersect, or `None`.
+A:
+Approach: two pointers, each switching to the other list's head when it reaches the end. Both travel `a + b + c` nodes, so they meet at the intersection, or both reach `None` together.
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals, tail=None):
+    head = tail
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def get_intersection_node(a, b):
+    p, q = a, b
+    while p is not q:
+        p = p.next if p else b
+        q = q.next if q else a
+    return p
+
+
+shared = build([8, 4, 5])
+A = build([4, 1], shared)
+B = build([5, 6, 1], shared)
+assert get_intersection_node(A, B) is shared
+assert get_intersection_node(build([2, 6, 4]), build([1, 5])) is None
+```
+
+Complexity: O(a + b) time, O(1) space.
+F:
+- Prove the pointers meet even when the lengths differ.
+
+@@ Add Two Numbers | Medium | Linked list arithmetic
+Q: Two non-negative integers are stored in reverse digit order as linked lists. Return their sum as a linked list.
+
+Example: `[2,4,3] + [5,6,4]` → `[7,0,8]`
+A:
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def add_two_numbers(a, b):
+    dummy = tail = ListNode()
+    carry = 0
+    while a or b or carry:
+        total = carry + (a.val if a else 0) + (b.val if b else 0)
+        carry, digit = divmod(total, 10)
+        tail.next = tail = ListNode(digit)
+        a = a.next if a else None
+        b = b.next if b else None
+    return dummy.next
+
+
+assert to_list(add_two_numbers(build([2, 4, 3]), build([5, 6, 4]))) == [7, 0, 8]
+assert to_list(add_two_numbers(build([0]), build([0]))) == [0]
+assert to_list(add_two_numbers(build([9] * 7), build([9] * 4))) == [8, 9, 9, 9, 0, 0, 0, 1]
+```
+
+Complexity: O(max(n, m)).
+F:
+- Digits in forward order (Add Two Numbers II).
+
+@@ Add Two Numbers II | Medium | Stacks
+Q: The same as Add Two Numbers, but the digits are stored most-significant first. Don't reverse the inputs.
+
+Example: `[7,2,4,3] + [5,6,4]` → `[7,8,0,7]`
+A:
+Approach: push the digits of both lists onto stacks, then pop and add, building the result by prepending nodes.
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def add_two_numbers_forward(a, b):
+    s1, s2 = [], []
+    while a:
+        s1.append(a.val)
+        a = a.next
+    while b:
+        s2.append(b.val)
+        b = b.next
+    head, carry = None, 0
+    while s1 or s2 or carry:
+        total = carry + (s1.pop() if s1 else 0) + (s2.pop() if s2 else 0)
+        carry, digit = divmod(total, 10)
+        head = ListNode(digit, head)
+    return head
+
+
+assert to_list(add_two_numbers_forward(build([7, 2, 4, 3]), build([5, 6, 4]))) == [7, 8, 0, 7]
+assert to_list(add_two_numbers_forward(build([2, 4, 3]), build([5, 6, 4]))) == [8, 0, 7]
+assert to_list(add_two_numbers_forward(build([0]), build([0]))) == [0]
+```
+
+Complexity: O(n + m) time and space.
+F:
+- Solve it without extra stacks (pad the shorter list, then recurse).
+
+@@ Reorder List | Medium | Linked list
+Q: Reorder `L0→L1→…→Ln` into `L0→Ln→L1→Ln-1→…` in place.
+A:
+Approach: three standard moves: find the middle, reverse the second half, then merge the two halves alternately.
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def reorder_list(head) -> None:
+    if not head or not head.next:
+        return
+    slow, fast = head, head.next
+    while fast and fast.next:
+        slow, fast = slow.next, fast.next.next
+    second, slow.next = slow.next, None
+    prev = None
+    while second:
+        nxt = second.next
+        second.next = prev
+        prev, second = second, nxt
+    first, second = head, prev
+    while second:
+        n1, n2 = first.next, second.next
+        first.next, second.next = second, n1
+        first, second = n1, n2
+
+
+for vals, expected in (([1, 2, 3, 4], [1, 4, 2, 3]), ([1, 2, 3, 4, 5], [1, 5, 2, 4, 3]), ([1], [1])):
+    h = build(vals)
+    reorder_list(h)
+    assert to_list(h) == expected
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Which of the three sub-steps is most error-prone, and how do you test it?
+
+@@ Odd Even Linked List | Medium | Linked list
+Q: Group the nodes at odd positions first, then the nodes at even positions, in place and preserving relative order.
+
+Example: `[2,1,3,5,6,4,7]` → `[2,3,6,7,1,5,4]`
+A:
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def odd_even_list(head):
+    if not head:
+        return head
+    odd, even = head, head.next
+    even_head = even
+    while even and even.next:
+        odd.next = even.next
+        odd = odd.next
+        even.next = odd.next
+        even = even.next
+    odd.next = even_head
+    return head
+
+
+assert to_list(odd_even_list(build([1, 2, 3, 4, 5]))) == [1, 3, 5, 2, 4]
+assert to_list(odd_even_list(build([2, 1, 3, 5, 6, 4, 7]))) == [2, 3, 6, 7, 1, 5, 4]
+assert to_list(odd_even_list(None)) == []
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Partition by a predicate on the value instead of the position.
+
+@@ Rotate List | Medium | Linked list
+Q: Rotate a linked list to the right by `k` places.
+
+Example: `[1,2,3,4,5], k = 2` → `[4,5,1,2,3]`
+A:
+Approach: find the length and the tail, and take `k %= n`. Make the list circular, then break it at position `n - k`.
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def rotate_right(head, k: int):
+    if not head or not head.next:
+        return head
+    n, tail = 1, head
+    while tail.next:
+        tail = tail.next
+        n += 1
+    k %= n
+    if k == 0:
+        return head
+    tail.next = head
+    new_tail = head
+    for _ in range(n - k - 1):
+        new_tail = new_tail.next
+    new_head, new_tail.next = new_tail.next, None
+    return new_head
+
+
+assert to_list(rotate_right(build([1, 2, 3, 4, 5]), 2)) == [4, 5, 1, 2, 3]
+assert to_list(rotate_right(build([0, 1, 2]), 4)) == [2, 0, 1]
+assert to_list(rotate_right(None, 0)) == []
+assert to_list(rotate_right(build([1, 2]), 2)) == [1, 2]
+```
+
+Complexity: O(n).
+F:
+- Why is `k %= n` essential when k can be 2·10^9?
+
+@@ Swap Nodes in Pairs | Medium | Linked list
+Q: Swap every two adjacent nodes by relinking them, not by swapping values.
+
+Example: `[1,2,3,4]` → `[2,1,4,3]`
+A:
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def swap_pairs(head):
+    dummy = prev = ListNode(0, head)
+    while prev.next and prev.next.next:
+        a, b = prev.next, prev.next.next
+        prev.next, a.next, b.next = b, b.next, a
+        prev = a
+    return dummy.next
+
+
+assert to_list(swap_pairs(build([1, 2, 3, 4]))) == [2, 1, 4, 3]
+assert to_list(swap_pairs(build([]))) == []
+assert to_list(swap_pairs(build([1]))) == [1]
+assert to_list(swap_pairs(build([1, 2, 3]))) == [2, 1, 3]
+```
+
+Complexity: O(n) time, O(1) space.
+
+The multiple assignment works because the right-hand side `(b, b.next, a)` is fully evaluated before any link changes.
+F:
+- The generalisation is Reverse Nodes in k-Group.
+
+@@ Reverse Nodes in k-Group | Hard | Linked list
+Q: Reverse the nodes k at a time. A final group with fewer than k nodes stays as it is.
+
+Example: `[1,2,3,4,5], k = 3` → `[3,2,1,4,5]`
+A:
+Approach: for each group, first check that k nodes exist. Reverse the group, pointing its first node at the next group, then reconnect it to the previous group and move `group_prev` to the new tail.
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def reverse_k_group(head, k: int):
+    dummy = ListNode(0, head)
+    group_prev = dummy
+    while True:
+        kth = group_prev
+        for _ in range(k):
+            kth = kth.next
+            if kth is None:
+                return dummy.next
+        group_next = kth.next
+        prev, cur = group_next, group_prev.next
+        while cur is not group_next:
+            nxt = cur.next
+            cur.next = prev
+            prev, cur = cur, nxt
+        first = group_prev.next
+        group_prev.next = kth
+        group_prev = first
+
+
+assert to_list(reverse_k_group(build([1, 2, 3, 4, 5]), 2)) == [2, 1, 4, 3, 5]
+assert to_list(reverse_k_group(build([1, 2, 3, 4, 5]), 3)) == [3, 2, 1, 4, 5]
+assert to_list(reverse_k_group(build([1, 2, 3]), 1)) == [1, 2, 3]
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Also reverse the final partial group.
+
+@@ Remove Duplicates from Sorted List | Easy | Linked list
+Q: Delete duplicates from a sorted list so each value appears once.
+A:
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def delete_duplicates(head):
+    cur = head
+    while cur and cur.next:
+        if cur.next.val == cur.val:
+            cur.next = cur.next.next
+        else:
+            cur = cur.next
+    return head
+
+
+assert to_list(delete_duplicates(build([1, 1, 2]))) == [1, 2]
+assert to_list(delete_duplicates(build([1, 1, 2, 3, 3]))) == [1, 2, 3]
+assert to_list(delete_duplicates(None)) == []
+```
+
+Complexity: O(n).
+F:
+- An unsorted list (use a set of seen values).
+
+@@ Remove Duplicates from Sorted List II | Medium | Linked list
+Q: Delete every node whose value is duplicated, keeping only values that appear once.
+
+Example: `[1,2,3,3,4,4,5]` → `[1,2,5]`
+A:
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def delete_all_duplicates(head):
+    dummy = prev = ListNode(0, head)
+    cur = head
+    while cur:
+        if cur.next and cur.next.val == cur.val:
+            v = cur.val
+            while cur and cur.val == v:
+                cur = cur.next
+            prev.next = cur
+        else:
+            prev, cur = cur, cur.next
+    return dummy.next
+
+
+assert to_list(delete_all_duplicates(build([1, 2, 3, 3, 4, 4, 5]))) == [1, 2, 5]
+assert to_list(delete_all_duplicates(build([1, 1, 1, 2, 3]))) == [2, 3]
+assert to_list(delete_all_duplicates(build([1, 1]))) == []
+```
+
+Complexity: O(n).
+F:
+- Why is the dummy node needed here? (The head itself may be deleted.)
+
+@@ Partition List | Medium | Linked list
+Q: Rearrange the list so all nodes less than `x` come before nodes ≥ `x`, preserving relative order within each part.
+
+Example: `[1,4,3,2,5,2], x = 3` → `[1,2,2,4,3,5]`
+A:
+Approach: build two lists with dummy heads and join them. Terminate the second list, otherwise a cycle can form.
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def partition(head, x: int):
+    lo_dummy = lo = ListNode()
+    hi_dummy = hi = ListNode()
+    while head:
+        if head.val < x:
+            lo.next = lo = head
+        else:
+            hi.next = hi = head
+        head = head.next
+    hi.next = None
+    lo.next = hi_dummy.next
+    return lo_dummy.next
+
+
+assert to_list(partition(build([1, 4, 3, 2, 5, 2]), 3)) == [1, 2, 2, 4, 3, 5]
+assert to_list(partition(build([2, 1]), 2)) == [1, 2]
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Explain the cycle bug that `hi.next = None` prevents.
+
+@@ Sort List | Medium | Linked list merge sort
+Q: Sort a linked list in O(n log n) time.
+A:
+Approach: merge sort. Split at the middle with fast and slow pointers, sort each half recursively and merge. The recursion depth is only O(log n).
+
+```python
+import random
+
+
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def sort_list(head):
+    if not head or not head.next:
+        return head
+    slow, fast = head, head.next
+    while fast and fast.next:
+        slow, fast = slow.next, fast.next.next
+    mid, slow.next = slow.next, None
+    a, b = sort_list(head), sort_list(mid)
+    dummy = tail = ListNode()
+    while a and b:
+        if a.val <= b.val:
+            tail.next, a = a, a.next
+        else:
+            tail.next, b = b, b.next
+        tail = tail.next
+    tail.next = a or b
+    return dummy.next
+
+
+assert to_list(sort_list(build([4, 2, 1, 3]))) == [1, 2, 3, 4]
+assert to_list(sort_list(build([-1, 5, 3, 4, 0]))) == [-1, 0, 3, 4, 5]
+assert to_list(sort_list(None)) == []
+rng = random.Random(2)
+data = [rng.randint(-100, 100) for _ in range(200)]
+assert to_list(sort_list(build(data))) == sorted(data)
+```
+
+Complexity: O(n log n) time, O(log n) recursion depth. A bottom-up version uses O(1) extra space.
+F:
+- Why is quicksort a poor fit for linked lists?
+
+@@ Copy List with Random Pointer | Medium | Hash map deep copy
+Q: Each node has `next` and `random` pointers. Return a deep copy of the list.
+A:
+Approach: two passes with a map from old node to new node. First create every copy, then wire up `next` and `random`. There is also an O(1)-space trick that interleaves the copies into the original list.
+
+```python
+class Node:
+    def __init__(self, val, next=None, random=None):
+        self.val, self.next, self.random = val, next, random
+
+
+def copy_random_list(head):
+    clones = {None: None}
+    node = head
+    while node:
+        clones[node] = Node(node.val)
+        node = node.next
+    node = head
+    while node:
+        clones[node].next = clones[node.next]
+        clones[node].random = clones[node.random]
+        node = node.next
+    return clones[head]
+
+
+spec = [[7, None], [13, 0], [11, 4], [10, 2], [1, 0]]
+nodes = [Node(v) for v, _ in spec]
+for i, (_, r) in enumerate(spec):
+    nodes[i].next = nodes[i + 1] if i + 1 < len(nodes) else None
+    nodes[i].random = nodes[r] if r is not None else None
+copy = copy_random_list(nodes[0])
+originals = set(map(id, nodes))
+cur, out = copy, []
+while cur:
+    assert id(cur) not in originals
+    out.append([cur.val, cur.random.val if cur.random else None])
+    cur = cur.next
+assert out == [[7, None], [13, 7], [11, 1], [10, 11], [1, 7]]
+```
+
+Complexity: O(n) time and space.
+F:
+- The O(1)-space interleaving technique.
+- Deep-copy a general object graph with cycles (this is what `copy.deepcopy`'s memo dict does).
+
+@@ Remove Linked List Elements | Easy | Linked list
+Q: Remove every node with value `val`.
+A:
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def remove_elements(head, val: int):
+    dummy = cur = ListNode(0, head)
+    while cur.next:
+        if cur.next.val == val:
+            cur.next = cur.next.next
+        else:
+            cur = cur.next
+    return dummy.next
+
+
+assert to_list(remove_elements(build([1, 2, 6, 3, 4, 5, 6]), 6)) == [1, 2, 3, 4, 5]
+assert to_list(remove_elements(build([7, 7, 7, 7]), 7)) == []
+assert to_list(remove_elements(None, 1)) == []
+```
+
+Complexity: O(n).
+F:
+- Why don't you advance `cur` after a deletion?
+
+@@ Delete Node in a Linked List | Medium | Linked list trick
+Q: You are given only a reference to a node, which is not the tail. Delete it from the list.
+A:
+Approach: copy the next node's value into this node, then unlink the next node. This isn't a true deletion: references to the next node now point at a detached node, which is why this trick is questioned in code review.
+
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def delete_node(node) -> None:
+    if node.next is None:
+        raise ValueError("cannot delete the tail with this technique")
+    node.val = node.next.val
+    node.next = node.next.next
+
+
+head = build([4, 5, 1, 9])
+delete_node(head.next)
+assert to_list(head) == [4, 1, 9]
+```
+
+Complexity: O(1).
+F:
+- What goes wrong if other code holds references to the nodes?
+
+@@ Flatten a Multilevel Doubly Linked List | Medium | Stack traversal
+Q: Nodes have `prev`, `next` and `child` pointers. Flatten the list depth-first so each child list comes right after its parent, and clear every `child` pointer.
+A:
+Approach: iterative DFS with a stack. When a node has a child, push its `next` onto the stack, splice the child in, and continue. When you reach the end, pop from the stack and splice that node in.
+
+```python
+class Node:
+    def __init__(self, val, prev=None, next=None, child=None):
+        self.val, self.prev, self.next, self.child = val, prev, next, child
+
+
+def chain(vals):
+    nodes = [Node(v) for v in vals]
+    for a, b in zip(nodes, nodes[1:]):
+        a.next, b.prev = b, a
+    return nodes
+
+
+def flatten(head):
+    cur, stack = head, []
+    while cur:
+        if cur.child:
+            if cur.next:
+                stack.append(cur.next)
+            cur.next, cur.child.prev = cur.child, cur
+            cur.child = None
+        if cur.next is None and stack:
+            nxt = stack.pop()
+            cur.next, nxt.prev = nxt, cur
+        cur = cur.next
+    return head
+
+
+top = chain([1, 2, 3, 4, 5, 6])
+mid = chain([7, 8, 9, 10])
+low = chain([11, 12])
+top[2].child, mid[1].child = mid[0], low[0]
+head = flatten(top[0])
+vals, node, last = [], head, None
+while node:
+    assert node.child is None and node.prev is last
+    vals.append(node.val)
+    last, node = node, node.next
+assert vals == [1, 2, 3, 7, 8, 11, 12, 9, 10, 4, 5, 6]
+```
+
+Complexity: O(n) time, O(depth) stack.
+F:
+- The recursive version, and its recursion-depth limit.
+
+@@ Insertion Sort List | Medium | Linked list
+Q: Sort a linked list using insertion sort.
+A:
+Approach: build a sorted list behind a dummy head. For each node, find its insertion point. If the node is at least the sorted tail, append it directly, which makes nearly-sorted input O(n).
+
+```python
+import random
+
+
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def insertion_sort_list(head):
+    dummy = ListNode(float("-inf"))
+    tail = dummy
+    while head:
+        nxt = head.next
+        if head.val >= tail.val:
+            tail.next, head.next, tail = head, None, head
+        else:
+            prev = dummy
+            while prev.next and prev.next.val <= head.val:
+                prev = prev.next
+            head.next, prev.next = prev.next, head
+        head = nxt
+    return dummy.next
+
+
+assert to_list(insertion_sort_list(build([4, 2, 1, 3]))) == [1, 2, 3, 4]
+data = random.Random(4).sample(range(100), 30)
+assert to_list(insertion_sort_list(build(data))) == sorted(data)
+```
+
+Complexity: O(n²) worst case, O(n) on sorted input, O(1) space.
+F:
+- When is insertion sort the right choice? (Tiny or nearly sorted inputs. Timsort uses it for short runs.)
+
+@@ Split Linked List in Parts | Medium | Linked list
+Q: Split a list into `k` consecutive parts whose sizes differ by at most one, with larger parts first. Some parts may be empty.
+A:
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def split_list_to_parts(head, k: int):
+    n, node = 0, head
+    while node:
+        n, node = n + 1, node.next
+    size, extra = divmod(n, k)
+    parts, cur = [], head
+    for i in range(k):
+        part_head = cur
+        for _ in range(size + (1 if i < extra else 0) - 1):
+            cur = cur.next if cur else None
+        if cur:
+            cur.next, cur = None, cur.next
+        parts.append(part_head)
+    return parts
+
+
+assert [to_list(p) for p in split_list_to_parts(build([1, 2, 3]), 5)] == [[1], [2], [3], [], []]
+assert [to_list(p) for p in split_list_to_parts(build(list(range(1, 11))), 3)] == [
+    [1, 2, 3, 4], [5, 6, 7], [8, 9, 10]]
+```
+
+Complexity: O(n + k).
+F:
+- Shard a work queue into k balanced batches (the same `divmod` arithmetic).
+
+@@ Maximum Twin Sum of a Linked List | Medium | Reverse half
+Q: In an even-length list, node i and node n-1-i are twins. Return the maximum twin sum.
+
+Example: `[5,4,2,1]` → `6`
+A:
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def pair_sum(head) -> int:
+    slow = fast = head
+    prev = None
+    while fast and fast.next:
+        fast = fast.next.next
+        nxt = slow.next
+        slow.next = prev
+        prev, slow = slow, nxt
+    best = 0
+    while slow:
+        best = max(best, prev.val + slow.val)
+        prev, slow = prev.next, slow.next
+    return best
+
+
+assert pair_sum(build([5, 4, 2, 1])) == 6
+assert pair_sum(build([4, 2, 2, 3])) == 7
+assert pair_sum(build([1, 100000])) == 100001
+```
+
+Complexity: O(n) time, O(1) space. It reverses the first half while finding the middle.
+F:
+- Restore the list afterwards.
+
+@@ Merge In Between Linked Lists | Medium | Linked list
+Q: Remove the nodes of `list1` from index `a` to `b` and splice `list2` in their place.
+A:
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def merge_in_between(list1, a: int, b: int, list2):
+    before = list1
+    for _ in range(a - 1):
+        before = before.next
+    after = before
+    for _ in range(b - a + 2):
+        after = after.next
+    before.next = list2
+    tail = list2
+    while tail.next:
+        tail = tail.next
+    tail.next = after
+    return list1
+
+
+out = merge_in_between(build([10, 1, 13, 6, 9, 5]), 3, 4, build([1000000, 1000001, 1000002]))
+assert to_list(out) == [10, 1, 13, 1000000, 1000001, 1000002, 5]
+```
+
+Complexity: O(n + m).
+F:
+- Handle `a == 0` (use a dummy head).
+
+@@ Delete the Middle Node of a Linked List | Medium | Fast and slow pointers
+Q: Delete the node at index `n // 2` (0-based).
+
+Example: `[1,3,4,7,1,2,6]` → `[1,3,4,1,2,6]`
+A:
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def delete_middle(head):
+    if not head or not head.next:
+        return None
+    slow, fast = head, head.next.next
+    while fast and fast.next:
+        slow, fast = slow.next, fast.next.next
+    slow.next = slow.next.next
+    return head
+
+
+assert to_list(delete_middle(build([1, 3, 4, 7, 1, 2, 6]))) == [1, 3, 4, 1, 2, 6]
+assert to_list(delete_middle(build([1, 2, 3, 4]))) == [1, 2, 4]
+assert to_list(delete_middle(build([2, 1]))) == [2]
+assert to_list(delete_middle(build([1]))) == []
+```
+
+Complexity: O(n).
+
+Starting `fast` two steps ahead leaves `slow` just before the middle.
+F:
+- Walk through the pointer offsets for the even and odd cases.
+
+@@ Swapping Nodes in a Linked List | Medium | Two pointers
+Q: Swap the values of the k-th node from the start and the k-th node from the end.
+
+Example: `[1,2,3,4,5], k = 2` → `[1,4,3,2,5]`
+A:
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def to_list(node):
+    out = []
+    while node:
+        out.append(node.val)
+        node = node.next
+    return out
+
+
+def swap_nodes(head, k: int):
+    first = head
+    for _ in range(k - 1):
+        first = first.next
+    second, probe = head, first
+    while probe.next:
+        second, probe = second.next, probe.next
+    first.val, second.val = second.val, first.val
+    return head
+
+
+assert to_list(swap_nodes(build([1, 2, 3, 4, 5]), 2)) == [1, 4, 3, 2, 5]
+assert to_list(swap_nodes(build([7, 9, 6, 6, 7, 8, 3, 0, 9, 5]), 5)) == [7, 9, 6, 6, 8, 7, 3, 0, 9, 5]
+assert to_list(swap_nodes(build([1]), 1)) == [1]
+```
+
+Complexity: O(n) time, O(1) space.
+F:
+- Swap the nodes themselves rather than their values (careful with adjacent nodes).
+
+@@ Convert Binary Number in a Linked List to Integer | Easy | Linked list
+Q: A linked list holds the bits of a binary number, most significant first. Return its value.
+A:
+```python
+class ListNode:
+    def __init__(self, val=0, next=None):
+        self.val, self.next = val, next
+
+
+def build(vals):
+    head = None
+    for v in reversed(vals):
+        head = ListNode(v, head)
+    return head
+
+
+def get_decimal_value(head) -> int:
+    value = 0
+    while head:
+        value = (value << 1) | head.val
+        head = head.next
+    return value
+
+
+assert get_decimal_value(build([1, 0, 1])) == 5
+assert get_decimal_value(build([0])) == 0
+assert get_decimal_value(build([1] * 30)) == 2**30 - 1
+```
+
+Complexity: O(n).
+F:
+- This is Horner's method. Where else does it appear? (Parsing numbers, polynomial hashing.)
+
+@@ Design Linked List | Medium | Linked list design
+Q: Implement a linked list with `get(i)`, `add_at_head`, `add_at_tail`, `add_at_index(i, v)` and `delete_at_index(i)`. Invalid indices are ignored, or return -1 for `get`.
+A:
+Approach: a sentinel head plus a size counter, and one `_node_before(i)` helper so every operation shares the same walking logic.
+
+```python
+class _Node:
+    __slots__ = ("val", "next")
+
+    def __init__(self, val: int, next=None) -> None:
+        self.val, self.next = val, next
+
+
+class MyLinkedList:
+    def __init__(self) -> None:
+        self._head = _Node(0)
+        self._size = 0
+
+    def _node_before(self, index: int) -> _Node:
+        node = self._head
+        for _ in range(index):
+            node = node.next
+        return node
+
+    def get(self, index: int) -> int:
+        if not 0 <= index < self._size:
+            return -1
+        return self._node_before(index).next.val
+
+    def add_at_head(self, val: int) -> None:
+        self.add_at_index(0, val)
+
+    def add_at_tail(self, val: int) -> None:
+        self.add_at_index(self._size, val)
+
+    def add_at_index(self, index: int, val: int) -> None:
+        if not 0 <= index <= self._size:
+            return
+        prev = self._node_before(index)
+        prev.next = _Node(val, prev.next)
+        self._size += 1
+
+    def delete_at_index(self, index: int) -> None:
+        if not 0 <= index < self._size:
+            return
+        prev = self._node_before(index)
+        prev.next = prev.next.next
+        self._size -= 1
+
+
+ll = MyLinkedList()
+ll.add_at_head(1)
+ll.add_at_tail(3)
+ll.add_at_index(1, 2)
+assert [ll.get(i) for i in range(3)] == [1, 2, 3]
+ll.delete_at_index(1)
+assert ll.get(1) == 3 and ll.get(5) == -1
+```
+
+Complexity: O(i) for index-based operations and O(1) for `add_at_head`. Keeping a tail pointer makes `add_at_tail` O(1).
+
+`__slots__` removes the per-node `__dict__`, which saves a lot of memory for millions of nodes.
+F:
+- Make it doubly linked and pick the closer end for index operations.
+
+@@ LRU Cache | Medium | Hash map with doubly linked list
+Q: Design an LRU cache with `get(key)` and `put(key, value)`, both O(1). When capacity is exceeded, evict the least recently used key.
+A:
+Seen in: JPMorgan-tagged list, and one of the most frequent design-a-structure questions in bank interviews.
+
+Approach: a dict from key to node, plus a doubly linked list ordered by recency with sentinel head and tail. `get` moves the node to the front. `put` inserts or updates at the front and evicts from the back. Show the manual version first, then mention the `OrderedDict` shortcut.
+
+```python
+from collections import OrderedDict
+
+
+class _Node:
+    __slots__ = ("key", "val", "prev", "next")
+
+    def __init__(self, key=0, val=0):
+        self.key, self.val, self.prev, self.next = key, val, None, None
+
+
+class LRUCache:
+    def __init__(self, capacity: int) -> None:
+        if capacity <= 0:
+            raise ValueError("capacity must be positive")
+        self._cap = capacity
+        self._map: dict[int, _Node] = {}
+        self._head, self._tail = _Node(), _Node()
+        self._head.next, self._tail.prev = self._tail, self._head
+
+    def _unlink(self, node: _Node) -> None:
+        node.prev.next, node.next.prev = node.next, node.prev
+
+    def _push_front(self, node: _Node) -> None:
+        node.prev, node.next = self._head, self._head.next
+        self._head.next.prev = node
+        self._head.next = node
+
+    def get(self, key: int) -> int:
+        node = self._map.get(key)
+        if node is None:
+            return -1
+        self._unlink(node)
+        self._push_front(node)
+        return node.val
+
+    def put(self, key: int, value: int) -> None:
+        node = self._map.get(key)
+        if node:
+            node.val = value
+            self._unlink(node)
+        else:
+            if len(self._map) == self._cap:
+                lru = self._tail.prev
+                self._unlink(lru)
+                del self._map[lru.key]
+            node = _Node(key, value)
+            self._map[key] = node
+        self._push_front(node)
+
+
+class LRUCacheOD:
+    def __init__(self, capacity: int) -> None:
+        self._cap, self._od = capacity, OrderedDict()
+
+    def get(self, key: int) -> int:
+        if key not in self._od:
+            return -1
+        self._od.move_to_end(key)
+        return self._od[key]
+
+    def put(self, key: int, value: int) -> None:
+        self._od[key] = value
+        self._od.move_to_end(key)
+        if len(self._od) > self._cap:
+            self._od.popitem(last=False)
+
+
+for cls in (LRUCache, LRUCacheOD):
+    c = cls(2)
+    c.put(1, 1)
+    c.put(2, 2)
+    assert c.get(1) == 1
+    c.put(3, 3)
+    assert c.get(2) == -1
+    c.put(4, 4)
+    assert c.get(1) == -1 and c.get(3) == 3 and c.get(4) == 4
+```
+
+Complexity: O(1) per operation, O(capacity) space.
+F:
+- Make it thread-safe. (A single lock is simplest. Discuss lock striping and why `get` also mutates state.)
+- Add a TTL per entry.
+- An LRU in front of an LLM: what key would you use for a response cache, and what are the risks? (Model version, prompt hash, tenant; PII and staleness.)
+
+@@ LFU Cache | Hard | Frequency buckets
+Q: Design an LFU cache with O(1) `get` and `put`. Evict the least frequently used key, breaking ties by least recently used.
+A:
+Approach: `key → (value, freq)`, plus `freq → OrderedDict of keys`, which keeps LRU order within a frequency, plus `min_freq`. Touching a key moves it to the `freq+1` bucket. When the `min_freq` bucket empties, increment `min_freq`. A new key resets `min_freq` to 1.
+
+```python
+from collections import OrderedDict, defaultdict
+
+
+class LFUCache:
+    def __init__(self, capacity: int) -> None:
+        self._cap = capacity
+        self._vals: dict[int, list[int]] = {}
+        self._buckets: dict[int, OrderedDict] = defaultdict(OrderedDict)
+        self._min = 0
+
+    def _touch(self, key: int) -> None:
+        val, freq = self._vals[key]
+        del self._buckets[freq][key]
+        if not self._buckets[freq]:
+            del self._buckets[freq]
+            if self._min == freq:
+                self._min += 1
+        self._vals[key][1] = freq + 1
+        self._buckets[freq + 1][key] = None
+
+    def get(self, key: int) -> int:
+        if key not in self._vals:
+            return -1
+        self._touch(key)
+        return self._vals[key][0]
+
+    def put(self, key: int, value: int) -> None:
+        if self._cap <= 0:
+            return
+        if key in self._vals:
+            self._vals[key][0] = value
+            self._touch(key)
+            return
+        if len(self._vals) == self._cap:
+            evict, _ = self._buckets[self._min].popitem(last=False)
+            if not self._buckets[self._min]:
+                del self._buckets[self._min]
+            del self._vals[evict]
+        self._vals[key] = [value, 1]
+        self._buckets[1][key] = None
+        self._min = 1
+
+
+c = LFUCache(2)
+c.put(1, 1)
+c.put(2, 2)
+assert c.get(1) == 1
+c.put(3, 3)
+assert c.get(2) == -1 and c.get(3) == 3
+c.put(4, 4)
+assert c.get(1) == -1 and c.get(3) == 3 and c.get(4) == 4
+```
+
+Complexity: O(1) per operation.
+F:
+- When does LFU beat LRU? (Stable popularity. LRU handles bursty or scan workloads badly, and LFU adapts slowly when popularity shifts.)
+- W-TinyLFU (as used by Caffeine) in one paragraph.
+
+@@ Design Browser History | Medium | Array with cursor
+Q: Implement `visit(url)` (which clears forward history), `back(steps)` and `forward(steps)`, returning the current URL.
+A:
+Approach: a list plus a cursor `cur` and a logical end `last`. Visiting overwrites at `cur + 1` and truncates logically without reallocating.
+
+```python
+class BrowserHistory:
+    def __init__(self, homepage: str) -> None:
+        self._pages = [homepage]
+        self._cur = 0
+        self._last = 0
+
+    def visit(self, url: str) -> None:
+        self._cur += 1
+        if self._cur < len(self._pages):
+            self._pages[self._cur] = url
+        else:
+            self._pages.append(url)
+        self._last = self._cur
+
+    def back(self, steps: int) -> str:
+        self._cur = max(0, self._cur - steps)
+        return self._pages[self._cur]
+
+    def forward(self, steps: int) -> str:
+        self._cur = min(self._last, self._cur + steps)
+        return self._pages[self._cur]
+
+
+b = BrowserHistory("leetcode.com")
+for u in ("google.com", "facebook.com", "youtube.com"):
+    b.visit(u)
+assert b.back(1) == "facebook.com" and b.back(1) == "google.com" and b.forward(1) == "facebook.com"
+b.visit("linkedin.com")
+assert b.forward(2) == "linkedin.com" and b.back(2) == "google.com" and b.back(7) == "leetcode.com"
+```
+
+Complexity: O(1) per operation.
+F:
+- Conversation branching in a chat UI (edit a previous message and fork): a tree rather than a list.
+
+@@ Snapshot Array | Medium | Versioned values with binary search
+Q: Implement `set(index, val)`, `snap()` (which returns a snapshot id) and `get(index, snap_id)`.
+A:
+Approach: for each index, store a list of `(snap_id, value)` changes. `get` binary-searches the last change at or before `snap_id`. Memory grows with the number of changes, not the number of snapshots.
+
+```python
+from bisect import bisect_right
+
+
+class SnapshotArray:
+    def __init__(self, length: int) -> None:
+        self._history: list[list[tuple[int, int]]] = [[(0, 0)] for _ in range(length)]
+        self._snap = 0
+
+    def set(self, index: int, val: int) -> None:
+        h = self._history[index]
+        if h[-1][0] == self._snap:
+            h[-1] = (self._snap, val)
+        else:
+            h.append((self._snap, val))
+
+    def snap(self) -> int:
+        self._snap += 1
+        return self._snap - 1
+
+    def get(self, index: int, snap_id: int) -> int:
+        h = self._history[index]
+        i = bisect_right(h, (snap_id, float("inf"))) - 1
+        return h[i][1]
+
+
+sa = SnapshotArray(3)
+sa.set(0, 5)
+assert sa.snap() == 0
+sa.set(0, 6)
+assert sa.get(0, 0) == 5
+assert sa.snap() == 1 and sa.get(0, 1) == 6 and sa.get(1, 0) == 0
+```
+
+Complexity: O(1) for `set` and `snap`, O(log c) for `get`.
+
+This is the core idea behind MVCC in databases and behind checkpoint history in LangGraph (read state as of checkpoint N).
+F:
+- How does this relate to time-travel debugging of an agent's state?
+
+@@ Time Based Key-Value Store | Medium | Binary search on timestamps
+Q: `set(key, value, timestamp)` with increasing timestamps per key, and `get(key, timestamp)`, which returns the value with the largest timestamp ≤ the given timestamp, or `""`.
+A:
+```python
+from bisect import bisect_right
+from collections import defaultdict
+
+
+class TimeMap:
+    def __init__(self) -> None:
+        self._times: dict[str, list[int]] = defaultdict(list)
+        self._values: dict[str, list[str]] = defaultdict(list)
+
+    def set(self, key: str, value: str, timestamp: int) -> None:
+        self._times[key].append(timestamp)
+        self._values[key].append(value)
+
+    def get(self, key: str, timestamp: int) -> str:
+        i = bisect_right(self._times.get(key, []), timestamp)
+        return self._values[key][i - 1] if i else ""
+
+
+tm = TimeMap()
+tm.set("foo", "bar", 1)
+assert tm.get("foo", 1) == "bar" and tm.get("foo", 3) == "bar"
+tm.set("foo", "bar2", 4)
+assert tm.get("foo", 4) == "bar2" and tm.get("foo", 5) == "bar2"
+assert tm.get("foo", 0) == "" and tm.get("missing", 10) == ""
+```
+
+Complexity: O(1) for `set`, O(log n) for `get`.
+
+Parallel lists let `bisect` run on plain integers. `bisect` supports a `key=` argument since Python 3.10.
+F:
+- Timestamps arrive out of order (a sorted container, or insort).
+- "What was this customer's credit limit on date D?" is the same problem, and relates to SCD Type 2 tables.
+
+@@ Design Twitter | Medium | Heap merge
+Q: Implement `post_tweet(user, tweet_id)`, `get_news_feed(user)` (the 10 most recent tweets from the user and their followees), `follow` and `unfollow`.
+A:
+Approach: a global counter for ordering, per-user tweet lists and follow sets. The feed is a k-way merge of the most recent tweets using `heapq`. Mention fan-out-on-write versus fan-out-on-read for scale.
+
+```python
+import heapq
+import itertools
+from collections import defaultdict
+
+
+class Twitter:
+    def __init__(self) -> None:
+        self._clock = itertools.count()
+        self._tweets: dict[int, list[tuple[int, int]]] = defaultdict(list)
+        self._follows: dict[int, set[int]] = defaultdict(set)
+
+    def post_tweet(self, user_id: int, tweet_id: int) -> None:
+        self._tweets[user_id].append((next(self._clock), tweet_id))
+
+    def get_news_feed(self, user_id: int) -> list[int]:
+        users = self._follows[user_id] | {user_id}
+        recent = heapq.nlargest(10, (t for u in users for t in self._tweets[u][-10:]))
+        return [tweet_id for _, tweet_id in recent]
+
+    def follow(self, follower: int, followee: int) -> None:
+        if follower != followee:
+            self._follows[follower].add(followee)
+
+    def unfollow(self, follower: int, followee: int) -> None:
+        self._follows[follower].discard(followee)
+
+
+t = Twitter()
+t.post_tweet(1, 5)
+assert t.get_news_feed(1) == [5]
+t.follow(1, 2)
+t.post_tweet(2, 6)
+assert t.get_news_feed(1) == [6, 5]
+t.unfollow(1, 2)
+assert t.get_news_feed(1) == [5]
+```
+
+Complexity: the feed costs O(F·10 log 10) for F followees, because only the last 10 tweets of each user are considered.
+F:
+- Celebrity accounts with 10M followers (a hybrid push/pull model).
+
+@@ Max Stack | Hard | Heap with lazy deletion
+Q: Design a stack supporting `push`, `pop`, `top`, `peek_max` and `pop_max`. `pop_max` removes the top-most maximum.
+A:
+Approach: a list for stack order plus a max-heap keyed by `(-value, -id)`, so ties go to the most recent push. Both structures hold entry ids. Removing from one marks the id in a `removed` set, and the other structure skips removed entries lazily.
+
+```python
+import heapq
+import itertools
+
+
+class MaxStack:
+    def __init__(self) -> None:
+        self._stack: list[tuple[int, int]] = []
+        self._heap: list[tuple[int, int]] = []
+        self._removed: set[int] = set()
+        self._ids = itertools.count()
+
+    def push(self, x: int) -> None:
+        i = next(self._ids)
+        self._stack.append((x, i))
+        heapq.heappush(self._heap, (-x, -i))
+
+    def _clean_stack(self) -> None:
+        while self._stack[-1][1] in self._removed:
+            self._removed.discard(self._stack.pop()[1])
+
+    def _clean_heap(self) -> None:
+        while -self._heap[0][1] in self._removed:
+            self._removed.discard(-heapq.heappop(self._heap)[1])
+
+    def pop(self) -> int:
+        self._clean_stack()
+        x, i = self._stack.pop()
+        self._removed.add(i)
+        return x
+
+    def top(self) -> int:
+        self._clean_stack()
+        return self._stack[-1][0]
+
+    def peek_max(self) -> int:
+        self._clean_heap()
+        return -self._heap[0][0]
+
+    def pop_max(self) -> int:
+        self._clean_heap()
+        x, neg_i = heapq.heappop(self._heap)
+        self._removed.add(-neg_i)
+        return -x
+
+
+s = MaxStack()
+for v in (5, 1, 5):
+    s.push(v)
+assert s.top() == 5 and s.pop_max() == 5 and s.top() == 1
+assert s.peek_max() == 5 and s.pop() == 1 and s.top() == 5
+```
+
+Complexity: O(log n) amortised per operation.
+
+Subtlety: an id is added to `removed` once and discarded once, when the other structure lazily skips it, so the set stays small.
+F:
+- Compare this with a doubly linked list plus a sorted map (TreeMap in Java).
+
+@@ Design Underground System | Medium | Hash maps
+Q: Implement `check_in(id, station, t)`, `check_out(id, station, t)` and `get_average_time(start, end)`.
+A:
+```python
+class UndergroundSystem:
+    def __init__(self) -> None:
+        self._open: dict[int, tuple[str, int]] = {}
+        self._stats: dict[tuple[str, str], list[int]] = {}
+
+    def check_in(self, id_: int, station: str, t: int) -> None:
+        if id_ in self._open:
+            raise ValueError(f"passenger {id_} already checked in")
+        self._open[id_] = (station, t)
+
+    def check_out(self, id_: int, station: str, t: int) -> None:
+        start, t0 = self._open.pop(id_)
+        total, count = self._stats.get((start, station), (0, 0))
+        self._stats[(start, station)] = [total + t - t0, count + 1]
+
+    def get_average_time(self, start: str, end: str) -> float:
+        total, count = self._stats[(start, end)]
+        return total / count
+
+
+u = UndergroundSystem()
+u.check_in(45, "Leyton", 3)
+u.check_in(32, "Paradise", 8)
+u.check_out(45, "Waterloo", 15)
+u.check_out(32, "Cambridge", 22)
+assert u.get_average_time("Paradise", "Cambridge") == 14.0
+u.check_in(10, "Leyton", 24)
+u.check_out(10, "Waterloo", 38)
+assert u.get_average_time("Leyton", "Waterloo") == 13.0
+```
+
+Complexity: O(1) per operation. Store the sum and count, not every trip.
+F:
+- Report p95 instead of the mean (you now need a histogram or sketch per route).
+
+@@ Design Parking System | Easy | Counters
+Q: A car park has slots for big, medium and small cars (types 1, 2 and 3). `add_car(type)` returns whether the car can park.
+A:
+```python
+class ParkingSystem:
+    def __init__(self, big: int, medium: int, small: int) -> None:
+        self._slots = [0, big, medium, small]
+
+    def add_car(self, car_type: int) -> bool:
+        if car_type not in (1, 2, 3):
+            raise ValueError("car_type must be 1, 2 or 3")
+        if self._slots[car_type] == 0:
+            return False
+        self._slots[car_type] -= 1
+        return True
+
+
+p = ParkingSystem(1, 1, 0)
+assert [p.add_car(1), p.add_car(2), p.add_car(3), p.add_car(1)] == [True, True, False, False]
+```
+
+Complexity: O(1).
+F:
+- Concurrency: two cars hit `add_car` at once (an atomic decrement, or `UPDATE ... WHERE slots > 0` in SQL).
+
+@@ Design Authentication Manager | Medium | TTL tokens
+Q: Tokens live for `ttl` seconds. `generate(id, t)` creates a token, `renew(id, t)` extends it only if it hasn't expired, and `count_unexpired(t)` counts the live tokens. A token expiring at time t counts as expired at t.
+A:
+Approach: a dict from token to expiry. Purge lazily on `count_unexpired`. For many tokens, an OrderedDict ordered by expiry (renew moves the token to the end) gives amortised O(1) purging, because all tokens share the same TTL.
+
+```python
+from collections import OrderedDict
+
+
+class AuthenticationManager:
+    def __init__(self, ttl: int) -> None:
+        self._ttl = ttl
+        self._expiry: OrderedDict[str, int] = OrderedDict()
+
+    def _purge(self, t: int) -> None:
+        while self._expiry and next(iter(self._expiry.values())) <= t:
+            self._expiry.popitem(last=False)
+
+    def generate(self, token_id: str, t: int) -> None:
+        self._expiry[token_id] = t + self._ttl
+        self._expiry.move_to_end(token_id)
+
+    def renew(self, token_id: str, t: int) -> None:
+        self._purge(t)
+        if token_id in self._expiry:
+            self._expiry[token_id] = t + self._ttl
+            self._expiry.move_to_end(token_id)
+
+    def count_unexpired(self, t: int) -> int:
+        self._purge(t)
+        return len(self._expiry)
+
+
+am = AuthenticationManager(5)
+am.renew("aaa", 1)
+am.generate("aaa", 2)
+assert am.count_unexpired(6) == 1
+am.generate("bbb", 7)
+am.renew("aaa", 8)
+am.renew("bbb", 10)
+assert am.count_unexpired(15) == 0
+```
+
+Complexity: amortised O(1).
+
+Security talking points: in production, prefer opaque random tokens (`secrets.token_urlsafe`) or signed JWTs with short lifetimes, server-side revocation lists, and clock-skew tolerance.
+F:
+- Tokens with different TTLs (a heap instead of insertion order).
+- Rotating refresh tokens and replay detection.
+
+@@ Design Bank System | Medium | Validation and state
+Q: Implement `Bank(balances)` with 1-indexed accounts, plus `transfer(a, b, money)`, `deposit(a, money)` and `withdraw(a, money)`. Each returns `False` for an invalid account or insufficient funds.
+A:
+Why it matters here: this is the simplest banking domain question. Interviewers probe validation, atomicity and money handling.
+
+Approach: validate before you mutate, so a failed transfer leaves both balances untouched. Use integers in minor units in real systems.
+
+```python
+class Bank:
+    def __init__(self, balance: list[int]) -> None:
+        self._bal = list(balance)
+
+    def _ok(self, account: int) -> bool:
+        return 1 <= account <= len(self._bal)
+
+    def transfer(self, a: int, b: int, money: int) -> bool:
+        if money < 0 or not (self._ok(a) and self._ok(b)) or self._bal[a - 1] < money:
+            return False
+        self._bal[a - 1] -= money
+        self._bal[b - 1] += money
+        return True
+
+    def deposit(self, account: int, money: int) -> bool:
+        if money < 0 or not self._ok(account):
+            return False
+        self._bal[account - 1] += money
+        return True
+
+    def withdraw(self, account: int, money: int) -> bool:
+        if money < 0 or not self._ok(account) or self._bal[account - 1] < money:
+            return False
+        self._bal[account - 1] -= money
+        return True
+
+
+bank = Bank([10, 100, 20, 50, 30])
+assert bank.withdraw(3, 10)
+assert bank.transfer(5, 1, 20)
+assert bank.deposit(5, 20)
+assert not bank.transfer(3, 4, 15)
+assert not bank.withdraw(10, 50)
+assert bank._bal == [30, 100, 10, 50, 30]
+```
+
+Complexity: O(1) per operation.
+F:
+- Make transfers safe under concurrency (lock both accounts in a consistent order to avoid deadlock, or use a DB transaction with `SELECT ... FOR UPDATE`).
+- Make them idempotent under client retries (an idempotency key table).
+- Replace mutable balances with an append-only double-entry ledger. What do you gain?
+
+@@ Design an ATM Machine | Medium | Greedy with rollback
+Q: An ATM holds $20, $50, $100, $200 and $500 notes. `deposit(counts)` adds notes. `withdraw(amount)` dispenses greedily, largest note first. If the exact amount can't be made that way, return `[-1]` and change nothing.
+A:
+Approach: compute the whole plan on a copy first, then commit. Never partially dispense.
+
+```python
+class ATM:
+    NOTES = (20, 50, 100, 200, 500)
+
+    def __init__(self) -> None:
+        self._counts = [0] * 5
+
+    def deposit(self, banknotes: list[int]) -> None:
+        for i, n in enumerate(banknotes):
+            self._counts[i] += n
+
+    def withdraw(self, amount: int) -> list[int]:
+        plan = [0] * 5
+        for i in range(4, -1, -1):
+            take = min(self._counts[i], amount // self.NOTES[i])
+            plan[i] = take
+            amount -= take * self.NOTES[i]
+        if amount:
+            return [-1]
+        for i in range(5):
+            self._counts[i] -= plan[i]
+        return plan
+
+
+atm = ATM()
+atm.deposit([0, 0, 1, 2, 1])
+assert atm.withdraw(600) == [0, 0, 1, 0, 1]
+atm.deposit([0, 1, 0, 1, 1])
+assert atm.withdraw(600) == [-1]
+assert atm.withdraw(550) == [0, 1, 0, 0, 1]
+```
+
+Complexity: O(1), because there are five denominations.
+
+The "plan, then commit" shape is the same as a transaction: compute, validate, then apply atomically.
+F:
+- Greedy can fail when a non-greedy combination exists (for example, 60 with 20s and 50s). Give the DP fix.
+
+@@ Design a Leaderboard | Medium | Hash map with heap
+Q: Implement `add_score(player, score)` (adds to the player's total), `top(k)` (the sum of the top k totals) and `reset(player)`.
+A:
+```python
+import heapq
+from collections import defaultdict
+
+
+class Leaderboard:
+    def __init__(self) -> None:
+        self._scores: dict[int, int] = defaultdict(int)
+
+    def add_score(self, player_id: int, score: int) -> None:
+        self._scores[player_id] += score
+
+    def top(self, k: int) -> int:
+        return sum(heapq.nlargest(k, self._scores.values()))
+
+    def reset(self, player_id: int) -> None:
+        self._scores.pop(player_id, None)
+
+
+lb = Leaderboard()
+for p, s in ((1, 73), (2, 56), (3, 39), (4, 51), (5, 4)):
+    lb.add_score(p, s)
+assert lb.top(1) == 73
+lb.reset(1)
+lb.reset(2)
+lb.add_score(2, 51)
+assert lb.top(3) == 141
+```
+
+Complexity: O(1) to add or reset, O(n log k) for `top`. If `top` is called frequently, use a sorted container keyed by score for O(k).
+
+At scale, this is a Redis sorted set (`ZINCRBY` and `ZREVRANGE`).
+F:
+- Real-time leaderboards for millions of players.
+
+@@ Stock Price Fluctuation | Medium | Heaps with lazy deletion
+Q: `update(timestamp, price)` may correct an earlier record. Support `current()` (the price at the latest timestamp), `maximum()` and `minimum()`.
+A:
+Approach: a dict from timestamp to price, the latest timestamp, and two heaps of `(price, timestamp)`. When a heap's top is stale (its price no longer matches the dict), pop it.
+
+```python
+import heapq
+
+
+class StockPrice:
+    def __init__(self) -> None:
+        self._prices: dict[int, int] = {}
+        self._latest = 0
+        self._max: list[tuple[int, int]] = []
+        self._min: list[tuple[int, int]] = []
+
+    def update(self, timestamp: int, price: int) -> None:
+        self._prices[timestamp] = price
+        self._latest = max(self._latest, timestamp)
+        heapq.heappush(self._max, (-price, timestamp))
+        heapq.heappush(self._min, (price, timestamp))
+
+    def current(self) -> int:
+        return self._prices[self._latest]
+
+    def maximum(self) -> int:
+        while self._prices[self._max[0][1]] != -self._max[0][0]:
+            heapq.heappop(self._max)
+        return -self._max[0][0]
+
+    def minimum(self) -> int:
+        while self._prices[self._min[0][1]] != self._min[0][0]:
+            heapq.heappop(self._min)
+        return self._min[0][0]
+
+
+sp = StockPrice()
+sp.update(1, 10)
+sp.update(2, 5)
+assert sp.current() == 5 and sp.maximum() == 10
+sp.update(1, 3)
+assert sp.maximum() == 5
+sp.update(4, 2)
+assert sp.minimum() == 2
+```
+
+Complexity: O(log n) amortised.
+
+Late corrections are routine in market data (trade busts, amended prints), so design for them.
+F:
+- Bound the memory used by stale heap entries (rebuild the heaps periodically).
+
+@@ Design Front Middle Back Queue | Medium | Two balanced deques
+Q: Support push and pop at the front, the middle and the back. With two middle positions, the frontmost one is the middle. Pops on an empty queue return -1.
+A:
+Approach: split the queue into two deques, `left` and `right`, with the invariant `len(left) ≤ len(right) ≤ len(left) + 1`. The middle is then always at the join between them.
+
+```python
+from collections import deque
+
+
+class FrontMiddleBackQueue:
+    def __init__(self) -> None:
+        self._l: deque[int] = deque()
+        self._r: deque[int] = deque()
+
+    def _balance(self) -> None:
+        while len(self._l) > len(self._r):
+            self._r.appendleft(self._l.pop())
+        while len(self._r) > len(self._l) + 1:
+            self._l.append(self._r.popleft())
+
+    def push_front(self, v: int) -> None:
+        self._l.appendleft(v)
+        self._balance()
+
+    def push_middle(self, v: int) -> None:
+        if len(self._l) == len(self._r):
+            self._r.appendleft(v)
+        else:
+            self._l.append(v)
+        self._balance()
+
+    def push_back(self, v: int) -> None:
+        self._r.append(v)
+        self._balance()
+
+    def pop_front(self) -> int:
+        if not self._r:
+            return -1
+        v = self._l.popleft() if self._l else self._r.popleft()
+        self._balance()
+        return v
+
+    def pop_middle(self) -> int:
+        if not self._r:
+            return -1
+        v = self._l.pop() if len(self._l) == len(self._r) else self._r.popleft()
+        self._balance()
+        return v
+
+    def pop_back(self) -> int:
+        if not self._r:
+            return -1
+        v = self._r.pop()
+        self._balance()
+        return v
+
+
+q = FrontMiddleBackQueue()
+q.push_front(1)
+q.push_back(2)
+q.push_middle(3)
+q.push_middle(4)
+assert [q.pop_front(), q.pop_middle(), q.pop_middle(), q.pop_back(), q.pop_front()] == [1, 3, 4, 2, -1]
+```
+
+Complexity: O(1) per operation.
+F:
+- Prove the invariant holds after every operation.
+
+@@ All O(1) Data Structure | Hard | Bucket linked list
+Q: Support `inc(key)`, `dec(key)` (removing the key at 0), `get_max_key()` and `get_min_key()`, all in O(1).
+A:
+Approach: a doubly linked list of buckets in increasing count order, where each bucket holds the set of keys with that count, plus a map from key to bucket. `inc` and `dec` move a key to the neighbouring bucket, creating it if needed, and delete buckets that become empty.
+
+```python
+class _Bucket:
+    def __init__(self, count: int) -> None:
+        self.count, self.keys = count, set()
+        self.prev = self.next = None
+
+
+class AllOne:
+    def __init__(self) -> None:
+        self._head, self._tail = _Bucket(0), _Bucket(0)
+        self._head.next, self._tail.prev = self._tail, self._head
+        self._where: dict[str, _Bucket] = {}
+
+    def _insert_after(self, node: _Bucket, count: int) -> _Bucket:
+        b = _Bucket(count)
+        b.prev, b.next = node, node.next
+        node.next.prev = b
+        node.next = b
+        return b
+
+    def _remove_if_empty(self, b: _Bucket) -> None:
+        if not b.keys:
+            b.prev.next, b.next.prev = b.next, b.prev
+
+    def inc(self, key: str) -> None:
+        cur = self._where.get(key, self._head)
+        nxt = cur.next
+        if nxt is self._tail or nxt.count != cur.count + 1:
+            nxt = self._insert_after(cur, cur.count + 1)
+        nxt.keys.add(key)
+        self._where[key] = nxt
+        if cur is not self._head:
+            cur.keys.discard(key)
+            self._remove_if_empty(cur)
+
+    def dec(self, key: str) -> None:
+        cur = self._where[key]
+        if cur.count == 1:
+            del self._where[key]
+        else:
+            prv = cur.prev
+            if prv is self._head or prv.count != cur.count - 1:
+                prv = self._insert_after(cur.prev, cur.count - 1)
+            prv.keys.add(key)
+            self._where[key] = prv
+        cur.keys.discard(key)
+        self._remove_if_empty(cur)
+
+    def get_max_key(self) -> str:
+        return next(iter(self._tail.prev.keys)) if self._tail.prev is not self._head else ""
+
+    def get_min_key(self) -> str:
+        return next(iter(self._head.next.keys)) if self._head.next is not self._tail else ""
+
+
+a = AllOne()
+a.inc("hello")
+a.inc("hello")
+assert a.get_max_key() == "hello" and a.get_min_key() == "hello"
+a.inc("leet")
+assert a.get_max_key() == "hello" and a.get_min_key() == "leet"
+a.dec("hello")
+a.dec("hello")
+assert a.get_max_key() == "leet" and a.get_min_key() == "leet"
+a.dec("leet")
+assert a.get_max_key() == "" and a.get_min_key() == ""
+```
+
+Complexity: O(1) per operation.
+F:
+- Where would you use this? (Hot-key detection, real-time frequency tracking.)
+
+@@ Design Phone Directory | Medium | Free list
+Q: Manage `max_numbers` slots with `get()` (returns a free number or -1), `check(n)` and `release(n)`.
+A:
+```python
+from collections import deque
+
+
+class PhoneDirectory:
+    def __init__(self, max_numbers: int) -> None:
+        self._free = deque(range(max_numbers))
+        self._available = set(range(max_numbers))
+
+    def get(self) -> int:
+        if not self._free:
+            return -1
+        n = self._free.popleft()
+        self._available.discard(n)
+        return n
+
+    def check(self, number: int) -> bool:
+        return number in self._available
+
+    def release(self, number: int) -> None:
+        if number not in self._available:
+            self._available.add(number)
+            self._free.append(number)
+
+
+d = PhoneDirectory(3)
+assert d.get() == 0 and d.get() == 1 and d.check(2)
+assert d.get() == 2 and not d.check(2) and d.get() == -1
+d.release(2)
+d.release(2)
+assert d.check(2) and d.get() == 2 and d.get() == -1
+```
+
+Complexity: O(1) per operation.
+
+The double-release guard matters: without it, the same number could be handed out twice.
+F:
+- This is essentially a connection-pool or port allocator. What about leaked handles? (Leases with TTLs.)
+
+@@ Design File System | Medium | Hash map of paths
+Q: `create_path(path, value)` succeeds only if the path is new and its parent exists. The root `""` always exists. `get(path)` returns the value or -1.
+A:
+```python
+class FileSystem:
+    def __init__(self) -> None:
+        self._paths: dict[str, int] = {"": -1}
+
+    def create_path(self, path: str, value: int) -> bool:
+        if not path.startswith("/") or path == "/" or path in self._paths:
+            return False
+        parent = path[: path.rfind("/")]
+        if parent not in self._paths:
+            return False
+        self._paths[path] = value
+        return True
+
+    def get(self, path: str) -> int:
+        return self._paths.get(path, -1) if path else -1
+
+
+fs = FileSystem()
+assert fs.create_path("/leet", 1) and fs.get("/leet") == 1
+assert fs.create_path("/leet/code", 2) and fs.get("/leet/code") == 2
+assert not fs.create_path("/c/d", 1) and fs.get("/c") == -1
+assert not fs.create_path("/leet", 5)
+```
+
+Complexity: O(L) per operation for a path of length L (hashing).
+
+A trie is the alternative, and it is better when you need listing or prefix operations.
+F:
+- Add `ls(path)` and `mkdir -p` (a trie).
+
+@@ Design an Ordered Stream | Easy | Pointer over array
+Q: n chunks with ids 1..n arrive in any order. `insert(id, value)` returns the longest run of consecutive chunks that can now be emitted in order.
+A:
+Why it matters here: reassembling out-of-order chunks is the same pattern as TCP segments, streamed LLM tool-call deltas, or Kafka messages with sequence numbers.
+
+```python
+class OrderedStream:
+    def __init__(self, n: int) -> None:
+        self._data: list[str | None] = [None] * (n + 1)
+        self._ptr = 1
+
+    def insert(self, id_key: int, value: str) -> list[str]:
+        self._data[id_key] = value
+        out = []
+        while self._ptr < len(self._data) and self._data[self._ptr] is not None:
+            out.append(self._data[self._ptr])
+            self._ptr += 1
+        return out
+
+
+s = OrderedStream(5)
+assert s.insert(3, "ccccc") == []
+assert s.insert(1, "aaaaa") == ["aaaaa"]
+assert s.insert(2, "bbbbb") == ["bbbbb", "ccccc"]
+assert s.insert(5, "eeeee") == []
+assert s.insert(4, "ddddd") == ["ddddd", "eeeee"]
+```
+
+Complexity: O(1) amortised per insert.
+F:
+- An unbounded stream with a reorder buffer limit and a timeout for gaps.
+
+@@ Design a Food Rating System | Medium | Heaps per group with lazy deletion
+Q: Foods have a cuisine and a rating. Support `change_rating(food, rating)` and `highest_rated(cuisine)`, breaking ties by the lexicographically smaller name.
+A:
+```python
+import heapq
+from collections import defaultdict
+
+
+class FoodRatings:
+    def __init__(self, foods: list[str], cuisines: list[str], ratings: list[int]) -> None:
+        self._rating: dict[str, int] = {}
+        self._cuisine: dict[str, str] = {}
+        self._heaps: dict[str, list[tuple[int, str]]] = defaultdict(list)
+        for f, c, r in zip(foods, cuisines, ratings):
+            self._rating[f], self._cuisine[f] = r, c
+            heapq.heappush(self._heaps[c], (-r, f))
+
+    def change_rating(self, food: str, new_rating: int) -> None:
+        self._rating[food] = new_rating
+        heapq.heappush(self._heaps[self._cuisine[food]], (-new_rating, food))
+
+    def highest_rated(self, cuisine: str) -> str:
+        heap = self._heaps[cuisine]
+        while -heap[0][0] != self._rating[heap[0][1]]:
+            heapq.heappop(heap)
+        return heap[0][1]
+
+
+fr = FoodRatings(["kimchi", "miso", "sushi", "moussaka", "ramen", "bulgogi"],
+                 ["korean", "japanese", "japanese", "greek", "japanese", "korean"],
+                 [9, 12, 8, 15, 14, 7])
+assert fr.highest_rated("korean") == "kimchi" and fr.highest_rated("japanese") == "ramen"
+fr.change_rating("sushi", 16)
+assert fr.highest_rated("japanese") == "sushi"
+fr.change_rating("ramen", 16)
+assert fr.highest_rated("japanese") == "ramen"
+```
+
+Complexity: O(log n) amortised.
+F:
+- Top-k per cuisine instead of the top 1.
+
+@@ TTL Cache with Injectable Clock | Medium | Cache design
+Q: Build a cache with a per-entry TTL and a maximum size (LRU eviction). It must be unit-testable without `sleep`.
+A:
+Why it matters here: response and embedding caches in front of LLM providers need both a TTL (staleness) and size limits (memory). Injecting the clock makes the expiry logic deterministic in tests, which is a strong signal in code review.
+
+```python
+import time
+from collections import OrderedDict
+from typing import Callable, Generic, Hashable, TypeVar
+
+V = TypeVar("V")
+
+
+class TTLCache(Generic[V]):
+    def __init__(self, max_size: int, ttl: float, clock: Callable[[], float] = time.monotonic) -> None:
+        self._data: OrderedDict[Hashable, tuple[float, V]] = OrderedDict()
+        self._max, self._ttl, self._clock = max_size, ttl, clock
+
+    def get(self, key: Hashable, default: V | None = None) -> V | None:
+        item = self._data.get(key)
+        if item is None:
+            return default
+        expires, value = item
+        if expires <= self._clock():
+            del self._data[key]
+            return default
+        self._data.move_to_end(key)
+        return value
+
+    def put(self, key: Hashable, value: V) -> None:
+        self._data[key] = (self._clock() + self._ttl, value)
+        self._data.move_to_end(key)
+        while len(self._data) > self._max:
+            self._data.popitem(last=False)
+
+
+class FakeClock:
+    def __init__(self) -> None:
+        self.now = 0.0
+
+    def __call__(self) -> float:
+        return self.now
+
+
+clock = FakeClock()
+cache: TTLCache[str] = TTLCache(max_size=2, ttl=10, clock=clock)
+cache.put("a", "A")
+clock.now = 5
+assert cache.get("a") == "A"
+clock.now = 10
+assert cache.get("a") is None
+cache.put("x", "X")
+cache.put("y", "Y")
+cache.put("z", "Z")
+assert cache.get("x") is None and cache.get("z") == "Z"
+```
+
+Complexity: O(1) per operation.
+
+Use `time.monotonic` rather than `time.time`, because wall-clock jumps (NTP adjustments) would otherwise break expiry.
+F:
+- Stampede protection when a hot key expires (single-flight, or a lock per key).
+- Negative caching (cache "not found" for a short TTL).
+
+@@ Bounded Blocking Queue | Medium | Concurrency primitives
+Q: Implement a thread-safe bounded queue where `put` blocks when full and `take` blocks when empty, with optional timeouts.
+A:
+Approach: one lock with two `Condition`s. Always wait in a `while` loop, because of spurious wakeups and stolen signals. Python's `queue.Queue` already does this, so say you'd use it in production and implement it here to show the mechanics.
+
+```python
+import threading
+from collections import deque
+
+
+class BoundedBlockingQueue:
+    def __init__(self, capacity: int) -> None:
+        self._items: deque = deque()
+        self._cap = capacity
+        lock = threading.Lock()
+        self._not_full = threading.Condition(lock)
+        self._not_empty = threading.Condition(lock)
+
+    def put(self, item, timeout: float | None = None) -> None:
+        with self._not_full:
+            if not self._not_full.wait_for(lambda: len(self._items) < self._cap, timeout):
+                raise TimeoutError("queue full")
+            self._items.append(item)
+            self._not_empty.notify()
+
+    def take(self, timeout: float | None = None):
+        with self._not_empty:
+            if not self._not_empty.wait_for(lambda: self._items, timeout):
+                raise TimeoutError("queue empty")
+            item = self._items.popleft()
+            self._not_full.notify()
+            return item
+
+    def size(self) -> int:
+        with self._not_full:
+            return len(self._items)
+
+
+q = BoundedBlockingQueue(2)
+results: list[int] = []
+
+
+def consumer() -> None:
+    for _ in range(100):
+        results.append(q.take(timeout=5))
+
+
+t = threading.Thread(target=consumer)
+t.start()
+for i in range(100):
+    q.put(i, timeout=5)
+t.join(timeout=10)
+assert results == list(range(100)) and q.size() == 0
+try:
+    q.take(timeout=0.05)
+    raise AssertionError("expected timeout")
+except TimeoutError:
+    pass
+```
+
+Complexity: O(1) per operation, excluding waiting.
+
+`wait_for` wraps the while-loop pattern and handles the timeout correctly.
+F:
+- What is backpressure, and why does a bounded queue give it to you for free?
+- The asyncio equivalent (`asyncio.Queue(maxsize=...)`).
+
+@@ Priority Task Queue with FIFO Ties and Cancellation | Medium | Heap design
+Q: Build a scheduler queue: tasks have a priority (lower runs first). Equal priorities run in FIFO order, and tasks can be cancelled by id. Model it on queueing LLM requests by tier.
+A:
+Approach: a heap of `[priority, seq, task_id]`, where the monotonically increasing `seq` guarantees FIFO order and avoids comparing task payloads. Cancellation marks the entry as removed. This is the pattern documented for `heapq` in the Python docs.
+
+```python
+import heapq
+import itertools
+
+
+class TaskQueue:
+    _REMOVED = object()
+
+    def __init__(self) -> None:
+        self._heap: list[list] = []
+        self._entries: dict[str, list] = {}
+        self._seq = itertools.count()
+
+    def push(self, task_id: str, priority: int) -> None:
+        if task_id in self._entries:
+            self.cancel(task_id)
+        entry = [priority, next(self._seq), task_id]
+        self._entries[task_id] = entry
+        heapq.heappush(self._heap, entry)
+
+    def cancel(self, task_id: str) -> None:
+        entry = self._entries.pop(task_id)
+        entry[2] = self._REMOVED
+
+    def pop(self) -> str:
+        while self._heap:
+            _, _, task_id = heapq.heappop(self._heap)
+            if task_id is not self._REMOVED:
+                del self._entries[task_id]
+                return task_id
+        raise KeyError("pop from empty queue")
+
+    def __len__(self) -> int:
+        return len(self._entries)
+
+
+q = TaskQueue()
+q.push("batch-1", 5)
+q.push("interactive-1", 1)
+q.push("interactive-2", 1)
+q.push("batch-2", 5)
+q.cancel("interactive-2")
+q.push("batch-1", 0)
+assert [q.pop() for _ in range(len(q))] == ["batch-1", "interactive-1", "batch-2"]
+```
+
+Complexity: O(log n) to push and pop, O(1) to cancel.
+F:
+- Starvation of low-priority work (ageing: raise the priority over time, or use weighted fair queuing).
+- A distributed version (Redis sorted sets, or SQS with separate queues per tier).
+
+@@ Design a Text Editor | Hard | Two stacks around a cursor
+Q: Implement `add_text(text)`, `delete_text(k)` (returns the number deleted), and `cursor_left(k)` and `cursor_right(k)`, which both return the last `min(10, len)` characters to the left of the cursor.
+A:
+Approach: two stacks. `left` holds the characters before the cursor, and `right` holds the characters after it in reverse. Every operation is proportional to k.
+
+```python
+class TextEditor:
+    def __init__(self) -> None:
+        self._left: list[str] = []
+        self._right: list[str] = []
+
+    def add_text(self, text: str) -> None:
+        self._left.extend(text)
+
+    def delete_text(self, k: int) -> int:
+        n = min(k, len(self._left))
+        del self._left[len(self._left) - n:]
+        return n
+
+    def _tail(self) -> str:
+        return "".join(self._left[-10:])
+
+    def cursor_left(self, k: int) -> str:
+        for _ in range(min(k, len(self._left))):
+            self._right.append(self._left.pop())
+        return self._tail()
+
+    def cursor_right(self, k: int) -> str:
+        for _ in range(min(k, len(self._right))):
+            self._left.append(self._right.pop())
+        return self._tail()
+
+
+ed = TextEditor()
+ed.add_text("leetcode")
+assert ed.delete_text(4) == 4
+ed.add_text("practice")
+assert ed.cursor_right(3) == "etpractice"
+assert ed.cursor_left(8) == "leet"
+assert ed.delete_text(10) == 4
+assert ed.cursor_left(2) == ""
+assert ed.cursor_right(6) == "practi"
+```
+
+Complexity: O(k) per operation.
+
+Alternatives for real editors: gap buffers, ropes, or piece tables (VS Code uses a piece tree).
+F:
+- Add undo and redo (a command stack of inverse operations).
+
+@@ Limit Order Book Matching Engine | Hard | Heaps with price-time priority
+Q: Implement a simple limit order book. `submit(order_id, side, price, qty)` matches against resting orders on the opposite side using price-time priority, at the resting order's price. It returns the trades as `(buy_id, sell_id, price, qty)`, and any remainder rests on the book. Support `cancel(order_id)`.
+A:
+Why it matters here: price-time priority matching is a common "banking-flavoured" coding exercise. It tests heaps, careful state updates and clear invariants.
+
+Approach: bids in a max-heap keyed by `(-price, seq)` and asks in a min-heap keyed by `(price, seq)`. `live` maps an order id to its remaining quantity. Cancellation is lazy: zero out the quantity and skip dead entries at the top.
+
+```python
+import heapq
+import itertools
+
+
+class OrderBook:
+    def __init__(self) -> None:
+        self._bids: list[tuple[int, int, str]] = []
+        self._asks: list[tuple[int, int, str]] = []
+        self._live: dict[str, int] = {}
+        self._price: dict[str, int] = {}
+        self._seq = itertools.count()
+
+    def _best(self, heap: list) -> tuple | None:
+        while heap and self._live.get(heap[0][2], 0) == 0:
+            heapq.heappop(heap)
+        return heap[0] if heap else None
+
+    def submit(self, order_id: str, side: str, price: int, qty: int) -> list[tuple[str, str, int, int]]:
+        if side not in ("buy", "sell") or qty <= 0 or price <= 0 or order_id in self._live:
+            raise ValueError("invalid order")
+        trades = []
+        book = self._asks if side == "buy" else self._bids
+        while qty:
+            top = self._best(book)
+            if top is None:
+                break
+            resting_id = top[2]
+            resting_price = self._price[resting_id]
+            crosses = price >= resting_price if side == "buy" else price <= resting_price
+            if not crosses:
+                break
+            fill = min(qty, self._live[resting_id])
+            self._live[resting_id] -= fill
+            qty -= fill
+            buy, sell = (order_id, resting_id) if side == "buy" else (resting_id, order_id)
+            trades.append((buy, sell, resting_price, fill))
+        if qty:
+            self._live[order_id], self._price[order_id] = qty, price
+            key = (-price, next(self._seq), order_id) if side == "buy" else (price, next(self._seq), order_id)
+            heapq.heappush(self._bids if side == "buy" else self._asks, key)
+        return trades
+
+    def cancel(self, order_id: str) -> bool:
+        if self._live.get(order_id, 0) == 0:
+            return False
+        self._live[order_id] = 0
+        return True
+
+
+ob = OrderBook()
+assert ob.submit("s1", "sell", 101, 5) == []
+assert ob.submit("s2", "sell", 100, 5) == []
+assert ob.submit("s3", "sell", 100, 5) == []
+assert ob.submit("b1", "buy", 100, 7) == [("b1", "s2", 100, 5), ("b1", "s3", 100, 2)]
+assert ob.cancel("s3")
+assert ob.submit("b2", "buy", 102, 10) == [("b2", "s1", 101, 5)]
+assert ob.submit("s4", "sell", 99, 3) == [("b2", "s4", 102, 3)]
+assert not ob.cancel("s3")
+```
+
+Complexity: O(log n) per resting order, plus O(log n) per fill.
+
+Invariants to state out loud: trades never cross the incoming order's limit price, earlier orders at the same price fill first, and quantities never go negative. Use integer ticks for prices, not floats.
+F:
+- Market orders and immediate-or-cancel (IOC) orders.
+- Per-price-level FIFO queues (a dict of price to deque plus a sorted price index) for O(1) fills.
+- Make the engine deterministic and replayable from an event log, which regulators and audit require.
