@@ -1,0 +1,3319 @@
+@@ What makes a system agentic | Easy | Agent foundations
+Q: What distinguishes an "agent" from a chatbot or a fixed LLM pipeline?
+A:
+An agent uses an LLM to decide its own control flow: which actions (tools) to take, in what order, and when it is done, based on the observations it gets back. The key ingredients:
+- A goal or task, rather than a single question.
+- Tools that let it observe and act (search, APIs, code execution, other agents).
+- A loop: think → act → observe → repeat, until a stop condition.
+- State and memory across steps (and sometimes across sessions).
+- Autonomy bounded by guardrails: budgets, permissions and human approvals.
+
+A chatbot answers from its context. A fixed pipeline (retrieve → generate) has hard-coded steps. An agent chooses the steps. That flexibility is its power (open-ended tasks) and its risk (loops, wrong actions, cost, security).
+F:
+- Is a RAG system with query rewriting an agent?
+
+@@ Workflows versus agents | Medium | Agent design
+Q: When should you build a deterministic workflow (the code decides the steps) instead of an autonomous agent (the model decides)?
+A:
+Prefer a workflow when:
+- The steps are known and stable (classify, then extract, then validate, then file). It is more predictable, testable, cheaper and easier to audit, which suits regulated processes.
+- Errors are costly, and every path must be reviewed and approved in advance.
+- Latency and cost budgets are tight.
+
+Prefer an agent when:
+- The task is open-ended or varies a lot (research, troubleshooting, multi-system investigation).
+- The number and order of steps depend on what is discovered along the way.
+- Tools are many and combinations are hard to enumerate.
+
+The common middle ground is a workflow with agentic nodes: a graph (for example LangGraph) where most edges are fixed, and specific nodes let the model choose among limited tools, with explicit approval nodes for side effects. Start with the simplest thing that works, and add autonomy only where evaluation shows it pays off.
+F:
+- How would you convert an agent that works in the demo into something auditable?
+
+@@ Anatomy of an agent loop | Easy | Agent foundations
+Q: Walk through the components of a production agent loop and what each is responsible for.
+A:
+1. Context assembly: system instructions, the task, relevant memory, tool definitions (only the allowed ones), and the conversation or scratchpad state.
+2. Model call: the LLM decides on a tool call (or several) or a final answer. Use structured tool calling with validated arguments.
+3. Policy checks: is this tool allowed for this user and task? Does it need approval? Is it within budget?
+4. Execution: run the tool with timeouts, retries (for idempotent calls) and idempotency keys (for writes).
+5. Observation handling: format and truncate the result, and mark untrusted content as data.
+6. State update: append to history, update structured state, and checkpoint.
+7. Stop check: final answer, step, token or cost limits, repeated-action detection, or a human interrupt.
+8. Output: the final answer with evidence, plus an action log for audit.
+
+Around it: tracing of every step, evaluation of trajectories, and error handling that returns useful errors to the model instead of crashing.
+F:
+- Which of these components must never be delegated to the model?
+
+@@ Minimal ReAct loop with a fake model | Medium | Agent loops
+Q: Implement a minimal ReAct-style loop: the model returns either a tool call or a final answer; tool results (or errors) are appended as observations; and the loop stops at a step limit.
+A:
+```python
+import json
+from typing import Callable
+
+
+def react(question: str, llm: Callable[[list[dict]], dict], tools: dict[str, Callable], max_steps: int = 5) -> dict:
+    messages = [{"role": "user", "content": question}]
+    for step in range(1, max_steps + 1):
+        action = llm(messages)
+        if action["type"] == "final":
+            return {"answer": action["content"], "steps": step, "messages": messages}
+        name, args = action["name"], action.get("args", {})
+        tool = tools.get(name)
+        if tool is None:
+            obs = {"error": f"unknown tool {name!r}; available: {sorted(tools)}"}
+        else:
+            try:
+                obs = {"result": tool(**args)}
+            except Exception as e:
+                obs = {"error": f"{type(e).__name__}: {e}"}
+        messages.append({"role": "assistant", "tool_call": {"name": name, "args": args}})
+        messages.append({"role": "tool", "name": name, "content": json.dumps(obs)})
+    return {"answer": None, "steps": max_steps, "stopped": "max_steps", "messages": messages}
+
+
+def get_fx(pair: str) -> float:
+    return {"GBPUSD": 1.27}[pair]
+
+
+script = iter([{"type": "tool", "name": "get_fx", "args": {"pair": "GBPUSD"}},
+               {"type": "final", "content": "£100 is about $127."}])
+out = react("How many dollars is £100?", lambda m: next(script), {"get_fx": get_fx})
+assert out["answer"] == "£100 is about $127." and out["steps"] == 2
+assert json.loads(out["messages"][-1]["content"]) == {"result": 1.27}
+
+errors = react("x", lambda m: {"type": "tool", "name": "get_fx", "args": {"pair": "XXX"}}, {"get_fx": get_fx}, 2)
+assert errors["stopped"] == "max_steps" and "KeyError" in errors["messages"][-1]["content"]
+```
+
+Returning tool errors to the model (instead of raising) lets it recover, for example by retrying with a corrected argument. Real implementations use native tool calling, parallel calls, token budgets and tracing, but the control flow is exactly this.
+F:
+- What goes wrong if tool exceptions crash the loop instead of being returned?
+
+@@ Tool registry with schemas and permissions | Medium | Tooling
+Q: Build a tool registry: tools are registered with a Pydantic argument model, a side-effect class (read or write) and the roles allowed to use them. It produces tool specs for the model and enforces validation and roles on every call.
+A:
+```python
+from dataclasses import dataclass
+from typing import Callable, Literal
+
+from pydantic import BaseModel, Field, ValidationError
+
+
+@dataclass
+class Tool:
+    name: str
+    description: str
+    args_model: type[BaseModel]
+    fn: Callable
+    effect: Literal["read", "write"]
+    roles: frozenset[str]
+
+
+class ToolRegistry:
+    def __init__(self) -> None:
+        self._tools: dict[str, Tool] = {}
+
+    def register(self, description: str, args_model: type[BaseModel], effect: str, roles: set[str]):
+        def deco(fn):
+            self._tools[fn.__name__] = Tool(fn.__name__, description, args_model, fn, effect, frozenset(roles))
+            return fn
+        return deco
+
+    def specs_for(self, role: str) -> list[dict]:
+        return [{"name": t.name, "description": t.description, "parameters": t.args_model.model_json_schema()}
+                for t in self._tools.values() if role in t.roles]
+
+    def call(self, name: str, args: dict, role: str) -> dict:
+        tool = self._tools.get(name)
+        if tool is None or role not in tool.roles:
+            return {"ok": False, "error": f"tool {name!r} not available for role {role!r}"}
+        try:
+            parsed = tool.args_model.model_validate(args)
+        except ValidationError as e:
+            return {"ok": False, "error": e.errors()[0]["msg"]}
+        return {"ok": True, "result": tool.fn(**parsed.model_dump()), "effect": tool.effect}
+
+
+reg = ToolRegistry()
+
+
+class BalanceArgs(BaseModel):
+    account_id: str = Field(pattern=r"^ACC-\d{4}$")
+
+
+@reg.register("Get the balance of an account", BalanceArgs, "read", {"analyst", "ops"})
+def get_balance(account_id: str) -> str:
+    return f"{account_id}: 1,000.00 GBP"
+
+
+assert [s["name"] for s in reg.specs_for("analyst")] == ["get_balance"] and reg.specs_for("guest") == []
+assert reg.call("get_balance", {"account_id": "ACC-0001"}, "ops")["ok"]
+assert not reg.call("get_balance", {"account_id": "x"}, "ops")["ok"]
+assert "not available" in reg.call("get_balance", {"account_id": "ACC-0001"}, "guest")["error"]
+```
+
+The model only sees the tools its role allows (smaller context, fewer mistakes). Every call is still re-checked, because the model can hallucinate tool names or be manipulated into calling tools it shouldn't.
+F:
+- Where would per-record authorisation (can this user see ACC-0001?) live?
+
+@@ Format tool results for the model | Medium | Tooling
+Q: Write a tool-result formatter: a consistent envelope for success and errors, JSON-safe serialisation of dates and Decimals, truncation with a note, and a `retryable` flag on errors to guide the model.
+A:
+```python
+import json
+from datetime import date
+from decimal import Decimal
+
+
+def format_result(data=None, error: Exception | None = None, max_chars: int = 500) -> str:
+    if error is not None:
+        retryable = isinstance(error, (TimeoutError, ConnectionError))
+        env = {"ok": False, "error": {"type": type(error).__name__, "message": str(error)[:200], "retryable": retryable}}
+        return json.dumps(env)
+    body = json.dumps({"ok": True, "data": data}, default=lambda o: str(o) if isinstance(o, (Decimal, date)) else repr(o))
+    if len(body) > max_chars:
+        note = f'... [truncated {len(body) - max_chars} chars; request fewer results or a narrower filter]'
+        return body[:max_chars] + note
+    return body
+
+
+ok = json.loads(format_result({"balance": Decimal("12.50"), "as_of": date(2026, 9, 26)}))
+assert ok == {"ok": True, "data": {"balance": "12.50", "as_of": "2026-09-26"}}
+err = json.loads(format_result(error=TimeoutError("upstream took 10s")))
+assert err["error"] == {"type": "TimeoutError", "message": "upstream took 10s", "retryable": True}
+big = format_result({"rows": list(range(1000))}, max_chars=100)
+assert big.startswith('{"ok": true') and "truncated" in big
+```
+
+Consistent envelopes help models distinguish "no results" from "tool failed". The truncation note tells the model how to get a smaller result. Truncated JSON isn't valid JSON, which is acceptable for display to a model. For downstream code, keep the full result in state and give the model only the summary.
+F:
+- Should the model see raw stack traces? Why or why not?
+
+@@ Loop guards: steps, tokens and repetition | Medium | Agent safety
+Q: Implement a guard object that stops an agent when it exceeds a step limit, a token budget, or repeats the same tool call with identical arguments too many times.
+A:
+```python
+import json
+from collections import Counter
+
+
+class StopAgent(Exception):
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
+class LoopGuard:
+    def __init__(self, max_steps: int, max_tokens: int, max_repeats: int = 2) -> None:
+        self.max_steps, self.max_tokens, self.max_repeats = max_steps, max_tokens, max_repeats
+        self.steps = self.tokens = 0
+        self.calls: Counter[str] = Counter()
+
+    def check(self, tokens_used: int, tool_name: str | None = None, args: dict | None = None) -> None:
+        self.steps += 1
+        self.tokens += tokens_used
+        if self.steps > self.max_steps:
+            raise StopAgent("max_steps")
+        if self.tokens > self.max_tokens:
+            raise StopAgent("token_budget")
+        if tool_name:
+            key = tool_name + json.dumps(args or {}, sort_keys=True)
+            self.calls[key] += 1
+            if self.calls[key] > self.max_repeats:
+                raise StopAgent(f"repeated_call:{tool_name}")
+
+
+g = LoopGuard(max_steps=10, max_tokens=5_000)
+g.check(500, "search", {"q": "policy"})
+g.check(500, "search", {"q": "policy"})
+try:
+    g.check(500, "search", {"q": "policy"})
+    raise AssertionError
+except StopAgent as e:
+    assert e.reason == "repeated_call:search"
+g2 = LoopGuard(max_steps=10, max_tokens=1_000)
+g2.check(600)
+try:
+    g2.check(600)
+except StopAgent as e:
+    assert e.reason == "token_budget"
+```
+
+When a guard trips, don't just fail: return a graceful message ("I couldn't complete this; here's what I found so far") with the partial results, log the trace for review, and count guard trips per agent as a quality metric.
+F:
+- Why is "same tool with identical arguments" a better repetition signal than "same tool"?
+
+@@ Detect cyclic tool-call patterns | Medium | Agent safety
+Q: Agents sometimes oscillate between two or three actions (A, B, A, B…). Implement cycle detection on the recent call sequence for any period up to half the history.
+A:
+```python
+def detect_cycle(calls: list[str], min_repeats: int = 3, max_period: int = 4) -> int | None:
+    """Return the period p if the tail of `calls` is the same p-length block repeated min_repeats times."""
+    for p in range(1, max_period + 1):
+        needed = p * min_repeats
+        if len(calls) < needed:
+            break
+        tail = calls[-needed:]
+        block = tail[:p]
+        if all(tail[i] == block[i % p] for i in range(needed)):
+            return p
+    return None
+
+
+assert detect_cycle(["search", "read", "search", "read", "search", "read"]) == 2
+assert detect_cycle(["a", "a", "a"]) == 1
+assert detect_cycle(["plan", "search", "read", "answer"]) is None
+assert detect_cycle(["x", "a", "b", "c", "a", "b", "c", "a", "b", "c"]) == 3
+```
+
+Include the arguments in each call signature when they matter (alternating searches with different queries may be legitimate progress). On detection, inject a reflection prompt ("You seem to be repeating X and Y. Summarise what you know and choose a different approach or finish"), or stop and escalate.
+F:
+- How would you distinguish a legitimate polling loop from an unproductive cycle?
+
+@@ Plan-and-execute agent | Medium | Planning patterns
+Q: Implement plan-and-execute: a planner produces the steps (tool plus arguments, where arguments may reference earlier results as `$1`, `$2`), an executor runs them in order, and a final step synthesises the answer.
+A:
+```python
+import re
+from typing import Callable
+
+
+def resolve(value, results: list):
+    if isinstance(value, str):
+        m = re.fullmatch(r"\$(\d+)", value)
+        if m:
+            return results[int(m.group(1)) - 1]
+        return re.sub(r"\$(\d+)", lambda mm: str(results[int(mm.group(1)) - 1]), value)
+    return value
+
+
+def plan_and_execute(task: str, planner: Callable[[str], list[dict]], tools: dict[str, Callable],
+                     synthesize: Callable[[str, list], str]) -> dict:
+    plan = planner(task)
+    results = []
+    for i, step in enumerate(plan, 1):
+        args = {k: resolve(v, results) for k, v in step["args"].items()}
+        results.append(tools[step["tool"]](**args))
+    return {"plan": plan, "results": results, "answer": synthesize(task, results)}
+
+
+tools = {"lookup_employee": lambda name: {"Priya": "E-17"}[name],
+         "get_leave_balance": lambda employee_id: {"E-17": 12}[employee_id],
+         "calc": lambda expr: eval(expr, {"__builtins__": {}}, {})}
+planner = lambda task: [{"tool": "lookup_employee", "args": {"name": "Priya"}},
+                        {"tool": "get_leave_balance", "args": {"employee_id": "$1"}},
+                        {"tool": "calc", "args": {"expr": "$2 - 3"}}]
+out = plan_and_execute("How many leave days will Priya have after a 3-day trip?", planner, tools,
+                       lambda t, r: f"Priya will have {r[-1]} days left.")
+assert out["results"] == ["E-17", 12, 9] and out["answer"] == "Priya will have 9 days left."
+```
+
+Plan-and-execute uses fewer LLM calls than ReAct (one plan, then cheap execution), shows the plan upfront (good for approvals), and parallelises independent steps. The weakness is brittleness when a step's result invalidates the plan, which is what re-planning fixes. Note: the `calc` tool uses a restricted `eval` only for the demo. Never eval model-provided expressions in production; use a safe expression parser.
+F:
+- How would you let a human approve the plan before execution?
+
+@@ Re-planning after a failed step | Medium | Planning patterns
+Q: Extend plan-and-execute so that when a step fails, a re-planner receives the completed steps and the error and returns a revised remaining plan, with a cap on re-plans.
+A:
+```python
+from typing import Callable
+
+
+def execute_with_replanning(task: str, plan: list[dict], tools: dict[str, Callable],
+                            replanner: Callable[[str, list, str], list[dict]], max_replans: int = 2) -> dict:
+    done: list[tuple[dict, object]] = []
+    replans = 0
+    queue = list(plan)
+    while queue:
+        step = queue.pop(0)
+        try:
+            done.append((step, tools[step["tool"]](**step["args"])))
+        except Exception as e:
+            if replans == max_replans:
+                return {"status": "failed", "done": done, "error": str(e), "replans": replans}
+            replans += 1
+            queue = replanner(task, done, f"{step['tool']} failed: {e}")
+    return {"status": "ok", "done": done, "replans": replans}
+
+
+def book_hotel(hotel: str) -> str:
+    if hotel == "Grand":
+        raise RuntimeError("sold out")
+    return f"booked {hotel}"
+
+
+tools = {"book_hotel": book_hotel, "notify": lambda msg: f"sent: {msg}"}
+plan = [{"tool": "book_hotel", "args": {"hotel": "Grand"}}, {"tool": "notify", "args": {"msg": "Grand booked"}}]
+replanner = lambda task, done, err: [{"tool": "book_hotel", "args": {"hotel": "Plaza"}},
+                                     {"tool": "notify", "args": {"msg": "Plaza booked (Grand sold out)"}}]
+out = execute_with_replanning("book a hotel", plan, tools, replanner)
+assert out["status"] == "ok" and out["replans"] == 1
+assert [r for _, r in out["done"]] == ["booked Plaza", "sent: Plaza booked (Grand sold out)"]
+```
+
+Note that the stale step ("notify: Grand booked") was replaced, not executed, which is why the re-planner gets the whole remaining plan rather than a single substitute step. Cap re-plans, and escalate to a human when the cap is hit.
+F:
+- What context must the re-planner see to avoid repeating the failed choice?
+
+@@ Reflection and self-correction for agents | Medium | Agent patterns
+Q: What is reflection in agents, and when does it help versus waste tokens?
+A:
+Reflection means the agent (or a separate critic) reviews its intermediate or final output against the goal and feedback, then revises it: "the tests still fail with X, so the fix is incomplete"; "the answer lacks citations for claim 2".
+
+It helps when there is a real feedback signal: failing tests, validator errors, tool errors, a critic with a concrete rubric, or verification against sources. Code-fix agents (run the tests, reflect, patch again) are the classic success. Research tasks benefit from "what's still missing?" checks.
+
+It wastes tokens when the model just re-reads its own output with no new information. Self-critique without grounding often rubber-stamps or makes arbitrary edits, and it can talk itself out of correct answers.
+
+Implement it with bounded rounds, specific critique criteria, external signals wherever possible, and a record of what changed each round (for evaluation and audit).
+F:
+- Why does reflection work so well for code with unit tests?
+
+@@ Router pattern | Easy | Agent patterns
+Q: Implement a router that sends a request to a specialist agent based on a classifier's label and confidence, with a generalist fallback for low confidence or unknown labels.
+A:
+```python
+from typing import Callable
+
+
+def route_request(text: str, classify: Callable[[str], tuple[str, float]], agents: dict[str, Callable[[str], str]],
+                  fallback: Callable[[str], str], min_conf: float = 0.7) -> tuple[str, str]:
+    label, conf = classify(text)
+    if conf < min_conf or label not in agents:
+        return "generalist", fallback(text)
+    return label, agents[label](text)
+
+
+agents = {"hr": lambda t: "HR agent answer", "it": lambda t: "IT agent answer"}
+classify = lambda t: ("it", 0.93) if "vpn" in t.lower() else ("legal", 0.9) if "contract" in t else ("hr", 0.4)
+assert route_request("My VPN is down", classify, agents, lambda t: "general") == ("it", "IT agent answer")
+assert route_request("Review this contract", classify, agents, lambda t: "general")[0] == "generalist"
+assert route_request("Holiday question", classify, agents, lambda t: "general")[0] == "generalist"
+```
+
+Routing keeps each specialist's prompt and tool set small and focused, which improves accuracy, cost and permission scoping. The classifier can be a small model, an embedding nearest-neighbour or an LLM with an enum schema. Evaluate routing accuracy on its own, and log the route in every trace.
+F:
+- How would you handle a request that needs two specialists?
+
+@@ Supervisor multi-agent pattern | Medium | Multi-agent
+Q: Implement a supervisor that repeatedly chooses which worker agent acts next (or FINISH) based on the shared history, with a round limit.
+A:
+```python
+from typing import Callable
+
+
+def supervise(task: str, supervisor: Callable[[list[dict]], str], workers: dict[str, Callable[[list[dict]], str]],
+              max_rounds: int = 6) -> dict:
+    history = [{"from": "user", "content": task}]
+    for _ in range(max_rounds):
+        choice = supervisor(history)
+        if choice == "FINISH":
+            return {"status": "done", "history": history}
+        if choice not in workers:
+            history.append({"from": "system", "content": f"unknown worker {choice!r}"})
+            continue
+        history.append({"from": choice, "content": workers[choice](history)})
+    return {"status": "max_rounds", "history": history}
+
+
+def supervisor(history: list[dict]) -> str:
+    speakers = [h["from"] for h in history]
+    if "researcher" not in speakers:
+        return "researcher"
+    if "writer" not in speakers:
+        return "writer"
+    return "FINISH"
+
+
+workers = {"researcher": lambda h: "Found: London cap 180 GBP [pol-7]",
+           "writer": lambda h: "Draft: The London hotel cap is 180 GBP [pol-7]."}
+out = supervise("Write a note on the London hotel cap", supervisor, workers)
+assert out["status"] == "done" and [h["from"] for h in out["history"]] == ["user", "researcher", "writer"]
+```
+
+The supervisor centralises control, which makes it easier to reason about, to enforce budgets and to trace. The downsides are an extra LLM call per hop, and a context that grows with every worker's output (so pass summaries, not full transcripts). LangGraph's supervisor pattern implements this with workers as graph nodes or tools.
+F:
+- How would you stop the supervisor from bouncing between two workers forever?
+
+@@ Hierarchical agents | Medium | Multi-agent
+Q: When would you use a hierarchy of agents (a supervisor of supervisors), and what are the risks?
+A:
+Use it when a task spans several domains, each with its own tools and expertise, for example an operations agent delegating to a payments team supervisor (with reconciliation and investigation workers) and a comms team supervisor (with drafting and approval workers). Each level keeps a manageable context and tool set, and teams can own their sub-hierarchies.
+
+Risks:
+- Latency and cost multiply with depth (each level adds LLM calls).
+- Information loss: summaries passed up and down drop details, and misinterpretations compound ("telephone game").
+- Harder debugging and evaluation (nested trajectories).
+- Accountability and permissions become unclear if sub-agents act with the top-level agent's authority.
+
+Mitigations: keep the hierarchy shallow (usually two levels), use structured handoff and result schemas, apply per-level budgets, scope permissions per sub-agent, trace end to end, and evaluate each level separately.
+F:
+- How would you decide whether a sub-task deserves its own sub-agent?
+
+@@ Handoffs versus agents-as-tools | Medium | Multi-agent
+Q: Compare two ways of combining agents: handing off control of the conversation to another agent, versus calling another agent as a tool and getting its result back.
+A:
+Handoff (transfer control):
+- The receiving agent takes over the conversation with the user, for example triage handing off to a billing specialist.
+- Good when the specialist needs its own multi-turn dialogue, tools and persona.
+- Risks: loss of context unless it's passed explicitly, ping-pong handoffs, and the user noticing inconsistent behaviour.
+
+Agent-as-tool (delegate and return):
+- The orchestrator calls the sub-agent with a task and gets a result back, and it stays in charge of the conversation.
+- Good for bounded sub-tasks (research this, draft that) and parallel fan-out.
+- The orchestrator keeps a consistent voice and can combine results. The costs are nested latency, and results that must be summarised.
+
+Rule of thumb: use agents-as-tools for sub-tasks, and handoffs when the user should interact with the specialist directly. Both need structured payloads, budgets, tracing, and permission checks at the boundary. Across services, A2A formalises agent-to-agent tasks, and MCP formalises tools.
+F:
+- Which pattern makes audit trails easier, and why?
+
+@@ Handoff loop with ping-pong protection | Medium | Multi-agent
+Q: Implement a swarm-style loop where the active agent either replies or hands off to another agent, and the loop prevents infinite handoff ping-pong.
+A:
+```python
+from typing import Callable
+
+
+def run_swarm(message: str, agents: dict[str, Callable[[str], dict]], start: str, max_handoffs: int = 3) -> dict:
+    active, path = start, [start]
+    for _ in range(max_handoffs + 1):
+        out = agents[active](message)
+        if "handoff" not in out:
+            return {"agent": active, "reply": out["reply"], "path": path}
+        target = out["handoff"]
+        if target not in agents or target in path[-2:-1]:
+            return {"agent": active, "reply": "Let me connect you with a person who can help.", "path": path,
+                    "escalated": True}
+        active = target
+        path.append(target)
+    return {"agent": active, "reply": "Let me connect you with a person who can help.", "path": path, "escalated": True}
+
+
+agents = {
+    "triage": lambda m: {"handoff": "billing"} if "invoice" in m else {"reply": "How can I help?"},
+    "billing": lambda m: {"reply": "Your invoice was sent on 1 Oct."} if "copy" in m else {"handoff": "triage"},
+}
+assert run_swarm("I need a copy of my invoice", agents, "triage") == {
+    "agent": "billing", "reply": "Your invoice was sent on 1 Oct.", "path": ["triage", "billing"]}
+bounced = run_swarm("invoice dispute", agents, "triage")
+assert bounced["escalated"] and bounced["path"] == ["triage", "billing"]
+```
+
+Handing straight back to the agent you just came from is treated as ping-pong, and the conversation escalates to a human instead of looping. The handoff should also carry a structured summary, so the receiving agent doesn't re-ask the user everything.
+F:
+- What should the handoff payload contain so the user isn't asked to repeat themselves?
+
+@@ Parallel tool execution with timeouts | Medium | Concurrency
+Q: A model requests three independent tool calls in one turn. Execute them concurrently with per-call timeouts, and return partial results (with errors) in the original order.
+A:
+```python
+import asyncio
+import time
+from typing import Awaitable, Callable
+
+
+async def run_parallel(calls: list[tuple[str, Callable[[], Awaitable]]], timeout: float) -> list[dict]:
+    async def one(call_id: str, fn: Callable[[], Awaitable]) -> dict:
+        try:
+            return {"id": call_id, "ok": True, "result": await asyncio.wait_for(fn(), timeout)}
+        except asyncio.TimeoutError:
+            return {"id": call_id, "ok": False, "error": "timeout"}
+        except Exception as e:
+            return {"id": call_id, "ok": False, "error": f"{type(e).__name__}: {e}"}
+
+    return await asyncio.gather(*(one(cid, fn) for cid, fn in calls))
+
+
+async def delayed(value, delay):
+    await asyncio.sleep(delay)
+    return value
+
+
+async def failing():
+    raise ValueError("bad account")
+
+
+start = time.perf_counter()
+res = asyncio.run(run_parallel([("c1", lambda: delayed("fx=1.27", 0.05)), ("c2", lambda: delayed("slow", 1.0)),
+                                ("c3", failing), ("c4", lambda: delayed("bal=100", 0.05))], timeout=0.2))
+elapsed = time.perf_counter() - start
+assert [r["id"] for r in res] == ["c1", "c2", "c3", "c4"]
+assert res[1]["error"] == "timeout" and "ValueError" in res[2]["error"] and res[3]["result"] == "bal=100"
+assert elapsed < 0.6
+```
+
+Total latency is roughly the slowest call (capped by the timeout), not the sum. Only parallelise calls that are independent and safe to run concurrently: read calls usually are, and two writes to the same account usually aren't. Every result, including errors, goes back to the model with its `tool_call_id`.
+F:
+- How would you cap concurrency per downstream API?
+
+@@ Fan-out and fan-in with bounded concurrency | Medium | Concurrency
+Q: Implement map-reduce over sub-tasks with an async worker per item, bounded concurrency, and a reduce step, for example analysing 20 contracts in parallel and combining the findings.
+A:
+```python
+import asyncio
+from typing import Awaitable, Callable
+
+
+async def fan_out_fan_in(items: list, worker: Callable[[object], Awaitable[dict]], reduce: Callable[[list[dict]], dict],
+                         concurrency: int = 4) -> dict:
+    sem = asyncio.Semaphore(concurrency)
+    peak = active = 0
+
+    async def run(item):
+        nonlocal peak, active
+        async with sem:
+            active += 1
+            peak = max(peak, active)
+            try:
+                return await worker(item)
+            finally:
+                active -= 1
+
+    results = await asyncio.gather(*(run(i) for i in items), return_exceptions=True)
+    ok = [r for r in results if not isinstance(r, BaseException)]
+    failed = [items[i] for i, r in enumerate(results) if isinstance(r, BaseException)]
+    return {**reduce(ok), "failed": failed, "peak_concurrency": peak}
+
+
+async def analyse(contract_id: int) -> dict:
+    await asyncio.sleep(0.01)
+    if contract_id == 13:
+        raise RuntimeError("unreadable PDF")
+    return {"id": contract_id, "has_change_of_control": contract_id % 5 == 0}
+
+
+summary = asyncio.run(fan_out_fan_in(list(range(1, 21)), analyse,
+                                     lambda rs: {"flagged": sorted(r["id"] for r in rs if r["has_change_of_control"])}))
+assert summary["flagged"] == [5, 10, 15, 20] and summary["failed"] == [13] and summary["peak_concurrency"] <= 4
+```
+
+`return_exceptions=True` keeps one bad document from sinking the batch. Report failures explicitly, so the combined answer never silently omits a contract. In LangGraph, the same pattern uses `Send` to fan out to parallel node instances.
+F:
+- How would you make the final answer state which documents it couldn't analyse?
+
+@@ Topological sort of a task graph | Medium | Orchestration
+Q: An orchestrator receives tasks with dependencies. Implement Kahn's algorithm to produce an execution order, grouped into parallel "waves", and detect cycles with a helpful error.
+A:
+```python
+from collections import deque
+
+
+def execution_waves(deps: dict[str, set[str]]) -> list[list[str]]:
+    nodes = set(deps) | {d for ds in deps.values() for d in ds}
+    indeg = {n: 0 for n in nodes}
+    children: dict[str, list[str]] = {n: [] for n in nodes}
+    for n, ds in deps.items():
+        for d in ds:
+            indeg[n] += 1
+            children[d].append(n)
+    ready = deque(sorted(n for n in nodes if indeg[n] == 0))
+    waves, seen = [], 0
+    while ready:
+        wave = sorted(ready)
+        ready.clear()
+        waves.append(wave)
+        seen += len(wave)
+        for n in wave:
+            for c in children[n]:
+                indeg[c] -= 1
+                if indeg[c] == 0:
+                    ready.append(c)
+    if seen != len(nodes):
+        stuck = sorted(n for n, d in indeg.items() if d > 0)
+        raise ValueError(f"cycle detected among: {stuck}")
+    return waves
+
+
+deps = {"fetch_trades": set(), "fetch_positions": set(), "reconcile": {"fetch_trades", "fetch_positions"},
+        "report": {"reconcile"}, "notify": {"report"}}
+assert execution_waves(deps) == [["fetch_positions", "fetch_trades"], ["reconcile"], ["report"], ["notify"]]
+try:
+    execution_waves({"a": {"b"}, "b": {"a"}})
+    raise AssertionError
+except ValueError as e:
+    assert "cycle" in str(e)
+```
+
+Waves show the parallelism: everything in a wave can run concurrently. Validate LLM-generated plans this way before executing them, since models can produce cyclic or dangling dependencies.
+F:
+- How would you add a dependency on a task that doesn't exist to the error message?
+
+@@ Execute a task graph with maximum parallelism | Hard | Orchestration
+Q: Implement an async DAG executor: start each task as soon as its dependencies succeed, run independent tasks concurrently, and mark dependents of a failed task as skipped.
+A:
+```python
+import asyncio
+from typing import Awaitable, Callable
+
+
+async def run_dag(tasks: dict[str, tuple[set[str], Callable[[dict], Awaitable]]]) -> dict[str, dict]:
+    results: dict[str, dict] = {}
+    done_events = {name: asyncio.Event() for name in tasks}
+
+    async def run(name: str) -> None:
+        deps, fn = tasks[name]
+        for d in deps:
+            await done_events[d].wait()
+        if any(results[d]["status"] != "ok" for d in deps):
+            results[name] = {"status": "skipped"}
+        else:
+            try:
+                value = await fn({d: results[d]["value"] for d in deps})
+                results[name] = {"status": "ok", "value": value}
+            except Exception as e:
+                results[name] = {"status": "failed", "error": str(e)}
+        done_events[name].set()
+
+    await asyncio.gather(*(run(n) for n in tasks))
+    return results
+
+
+order: list[str] = []
+
+
+def step(name: str, value=None, fail: bool = False, delay: float = 0.01):
+    async def fn(inputs: dict):
+        order.append(f"start:{name}")
+        await asyncio.sleep(delay)
+        if fail:
+            raise RuntimeError(f"{name} failed")
+        return value if value is not None else sum(inputs.values())
+    return fn
+
+
+tasks = {
+    "a": (set(), step("a", 1)), "b": (set(), step("b", 2)),
+    "c": ({"a", "b"}, step("c")), "d": ({"a"}, step("d", fail=True)), "e": ({"d"}, step("e")),
+}
+res = asyncio.run(run_dag(tasks))
+assert res["c"] == {"status": "ok", "value": 3}
+assert res["d"]["status"] == "failed" and res["e"] == {"status": "skipped"}
+assert set(order[:2]) == {"start:a", "start:b"}
+```
+
+Validate the graph first (topological sort, no missing dependencies), because a missing dependency would wait forever here. Add per-task timeouts, retries for idempotent tasks, and checkpointing of results, so a crash doesn't redo finished work.
+F:
+- How would you add a global concurrency limit?
+
+@@ Critical path of an agent workflow | Medium | Orchestration
+Q: Given task durations and dependencies, compute the critical path (the longest chain that determines total latency), to know which step to optimise.
+A:
+```python
+from functools import lru_cache
+
+
+def critical_path(durations: dict[str, float], deps: dict[str, set[str]]) -> tuple[float, list[str]]:
+    @lru_cache(maxsize=None)
+    def finish(node: str) -> tuple[float, tuple[str, ...]]:
+        best = (0.0, ())
+        for d in deps.get(node, set()):
+            best = max(best, finish(d))
+        return best[0] + durations[node], best[1] + (node,)
+
+    total, path = max(finish(n) for n in durations)
+    return total, list(path)
+
+
+durations = {"plan": 1.2, "search_flights": 2.5, "search_hotels": 1.0, "check_policy": 0.4, "compose": 1.5}
+deps = {"search_flights": {"plan"}, "search_hotels": {"plan"}, "check_policy": {"search_flights", "search_hotels"},
+        "compose": {"check_policy"}}
+total, path = critical_path(durations, deps)
+assert abs(total - 5.6) < 1e-9 and path == ["plan", "search_flights", "check_policy", "compose"]
+```
+
+Speeding up `search_hotels` does nothing, because it isn't on the critical path. Optimise `search_flights` (cache it, use a faster API, return early with partial results) or the LLM steps (a smaller planner model, streaming the compose step). Use p95 durations from traces, not averages.
+F:
+- How does the critical path change when a step has retries?
+
+@@ Saga pattern for multi-step bookings | Hard | Transactions
+Q: A travel agent books flight, hotel and car in sequence across independent systems. Implement a saga: each step has an action and a compensation, and when a step fails, the completed steps are compensated in reverse order.
+A:
+```python
+from typing import Callable
+
+
+def run_saga(steps: list[tuple[str, Callable[[], str], Callable[[str], None]]]) -> dict:
+    completed: list[tuple[str, str, Callable[[str], None]]] = []
+    log = []
+    for name, action, compensate in steps:
+        try:
+            ref = action()
+            completed.append((name, ref, compensate))
+            log.append(f"done:{name}:{ref}")
+        except Exception as e:
+            log.append(f"failed:{name}:{e}")
+            for cname, cref, comp in reversed(completed):
+                try:
+                    comp(cref)
+                    log.append(f"compensated:{cname}:{cref}")
+                except Exception as ce:
+                    log.append(f"compensation_failed:{cname}:{ce}")
+            return {"status": "rolled_back", "log": log}
+    return {"status": "committed", "log": log}
+
+
+def car_fail():
+    raise RuntimeError("no cars available")
+
+
+cancelled: list[str] = []
+steps = [("flight", lambda: "FL-123", cancelled.append), ("hotel", lambda: "HT-9", cancelled.append),
+         ("car", car_fail, cancelled.append)]
+out = run_saga(steps)
+assert out["status"] == "rolled_back" and cancelled == ["HT-9", "FL-123"]
+assert out["log"][-2:] == ["compensated:hotel:HT-9", "compensated:flight:FL-123"]
+assert run_saga(steps[:2])["status"] == "committed"
+```
+
+Distributed systems rarely offer cross-system transactions, so sagas give eventual consistency through compensation. Production details:
+- Persist the saga log after each step (so a crash can resume or compensate).
+- Make actions and compensations idempotent (retries happen).
+- Compensation can fail (a non-refundable fare), so escalate those to humans.
+- Order the steps so the hardest-to-undo action goes last.
+
+This is the pattern behind multi-agent rebooking with rollback.
+F:
+- Why should the least reversible step go last?
+
+@@ Idempotency keys for tool calls | Medium | Reliability
+Q: Agents retry. Implement an idempotency layer for a write tool: the same key with the same payload returns the original result without re-executing; the same key with a different payload is rejected as a conflict.
+A:
+```python
+import hashlib
+import json
+from typing import Callable
+
+
+class IdempotencyConflict(Exception):
+    pass
+
+
+class IdempotentExecutor:
+    def __init__(self) -> None:
+        self._store: dict[str, tuple[str, object]] = {}
+
+    def execute(self, key: str, payload: dict, fn: Callable[[dict], object]) -> object:
+        digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+        if key in self._store:
+            stored_digest, result = self._store[key]
+            if stored_digest != digest:
+                raise IdempotencyConflict(f"key {key} reused with a different payload")
+            return result
+        result = fn(payload)
+        self._store[key] = (digest, result)
+        return result
+
+
+transfers: list[dict] = []
+
+
+def transfer(p: dict) -> str:
+    transfers.append(p)
+    return f"TX-{len(transfers)}"
+
+
+ex = IdempotentExecutor()
+p = {"from": "ACC-1", "to": "ACC-2", "amount": "250.00"}
+assert ex.execute("run42-step3", p, transfer) == "TX-1"
+assert ex.execute("run42-step3", dict(reversed(list(p.items()))), transfer) == "TX-1"
+assert len(transfers) == 1
+try:
+    ex.execute("run42-step3", {**p, "amount": "2500.00"}, transfer)
+    raise AssertionError
+except IdempotencyConflict:
+    pass
+```
+
+Derive keys from the run id plus the step (not from the model's output), so a retried step reuses its key. In production, store the keys in a database with a unique constraint and a TTL, record in-progress status to handle concurrent duplicates, and pass the key through to downstream APIs that support it (many payment APIs do).
+F:
+- How do you handle two concurrent requests with the same key?
+
+@@ Retry with exponential backoff and jitter | Medium | Reliability
+Q: Implement a retry helper for transient errors (429, timeouts) with capped exponential backoff and full jitter, using injectable sleep and random functions so it's testable, and honouring a server-provided `retry_after` hint.
+A:
+```python
+import random
+from typing import Callable
+
+
+class Retryable(Exception):
+    def __init__(self, msg: str, retry_after: float | None = None) -> None:
+        super().__init__(msg)
+        self.retry_after = retry_after
+
+
+def retry(fn: Callable[[], object], attempts: int = 5, base: float = 0.5, cap: float = 8.0,
+          sleep: Callable[[float], None] = lambda s: None, rng: random.Random | None = None):
+    rng = rng or random.Random()
+    for attempt in range(attempts):
+        try:
+            return fn()
+        except Retryable as e:
+            if attempt == attempts - 1:
+                raise
+            delay = e.retry_after if e.retry_after is not None else rng.uniform(0, min(cap, base * 2 ** attempt))
+            sleep(delay)
+
+
+calls, sleeps = [0], []
+
+
+def flaky():
+    calls[0] += 1
+    if calls[0] == 1:
+        raise Retryable("429", retry_after=2.0)
+    if calls[0] < 4:
+        raise Retryable("timeout")
+    return "ok"
+
+
+assert retry(flaky, sleep=sleeps.append, rng=random.Random(0)) == "ok"
+assert calls[0] == 4 and sleeps[0] == 2.0 and all(0 <= s <= 8 for s in sleeps[1:]) and len(sleeps) == 3
+try:
+    retry(lambda: (_ for _ in ()).throw(Retryable("always")), attempts=2, sleep=sleeps.append)
+    raise AssertionError
+except Retryable:
+    pass
+```
+
+Full jitter spreads retries out, which avoids thundering herds when many agents hit the same 429 at once. Only retry idempotent operations (or ones protected by idempotency keys), cap the total retry time within the request deadline, and count retries as a metric.
+F:
+- Why is retrying a non-idempotent payment call dangerous without idempotency keys?
+
+@@ Circuit breaker for flaky tools | Medium | Reliability
+Q: Implement a circuit breaker with closed, open and half-open states: open after N consecutive failures, fail fast while open, allow one trial call after a cool-down, and close again on success. Use an injectable clock.
+A:
+```python
+class CircuitOpen(Exception):
+    pass
+
+
+class CircuitBreaker:
+    def __init__(self, threshold: int, cooldown: float, clock) -> None:
+        self.threshold, self.cooldown, self.clock = threshold, cooldown, clock
+        self.failures = 0
+        self.state = "closed"
+        self.opened_at = 0.0
+
+    def call(self, fn):
+        if self.state == "open":
+            if self.clock() - self.opened_at < self.cooldown:
+                raise CircuitOpen("tool temporarily unavailable")
+            self.state = "half_open"
+        try:
+            result = fn()
+        except Exception:
+            self.failures += 1
+            if self.state == "half_open" or self.failures >= self.threshold:
+                self.state, self.opened_at = "open", self.clock()
+            raise
+        self.failures, self.state = 0, "closed"
+        return result
+
+
+t = [0.0]
+cb = CircuitBreaker(threshold=2, cooldown=30, clock=lambda: t[0])
+
+
+def boom():
+    raise ConnectionError("down")
+
+
+for _ in range(2):
+    try:
+        cb.call(boom)
+    except ConnectionError:
+        pass
+assert cb.state == "open"
+try:
+    cb.call(lambda: "never runs")
+    raise AssertionError
+except CircuitOpen:
+    pass
+t[0] = 31
+assert cb.call(lambda: "recovered") == "recovered" and cb.state == "closed"
+```
+
+For agents, return `CircuitOpen` to the model as a structured, non-retryable error ("the FX service is unavailable; proceed without it or tell the user"), so it adapts instead of hammering a dead dependency. Keep a breaker per downstream dependency, and expose its state as a metric.
+F:
+- What should happen in half-open state if several requests arrive at once?
+
+@@ Timeouts and cancellation in agent runs | Medium | Concurrency
+Q: Enforce a wall-clock timeout on an async agent run, and make sure cleanup (releasing locks, recording partial state) happens when the run is cancelled.
+A:
+```python
+import asyncio
+
+events: list[str] = []
+
+
+async def agent_run(steps: int) -> str:
+    events.append("lock_acquired")
+    try:
+        for i in range(steps):
+            await asyncio.sleep(0.02)
+            events.append(f"step{i}")
+        return "done"
+    except asyncio.CancelledError:
+        events.append("cancelled:partial_state_saved")
+        raise
+    finally:
+        events.append("lock_released")
+
+
+async def run_with_timeout(steps: int, timeout: float) -> str:
+    try:
+        return await asyncio.wait_for(agent_run(steps), timeout)
+    except asyncio.TimeoutError:
+        return "timed_out"
+
+
+assert asyncio.run(run_with_timeout(2, 1.0)) == "done" and events[-1] == "lock_released"
+events.clear()
+assert asyncio.run(run_with_timeout(50, 0.05)) == "timed_out"
+assert "cancelled:partial_state_saved" in events and events[-1] == "lock_released"
+```
+
+Cancellation arrives as `CancelledError` at an `await` point. Handle it to save state, then re-raise it, because swallowing it breaks cancellation semantics. Also cancel upstream LLM streams and HTTP requests when the user disconnects or a deadline passes, or you keep paying for tokens nobody reads.
+F:
+- Why must you re-raise `CancelledError` after cleanup?
+
+@@ Deadline propagation across nested calls | Medium | Concurrency
+Q: A request has a 10-second deadline, and nested steps (LLM calls, tools, sub-agents) must never wait beyond it. Implement deadline propagation with `contextvars`, so inner code can ask how much time remains and nested scopes can only shorten the deadline.
+A:
+```python
+import contextvars
+from contextlib import contextmanager
+
+_deadline = contextvars.ContextVar("deadline", default=float("inf"))
+
+
+class DeadlineExceeded(Exception):
+    pass
+
+
+@contextmanager
+def deadline(seconds: float, clock):
+    new = min(_deadline.get(), clock() + seconds)
+    token = _deadline.set(new)
+    try:
+        yield
+    finally:
+        _deadline.reset(token)
+
+
+def remaining(clock) -> float:
+    left = _deadline.get() - clock()
+    if left <= 0:
+        raise DeadlineExceeded("request deadline exceeded")
+    return left
+
+
+now = [100.0]
+clock = lambda: now[0]
+with deadline(10, clock):
+    assert remaining(clock) == 10
+    with deadline(30, clock):
+        assert remaining(clock) == 10
+    with deadline(3, clock):
+        now[0] += 1
+        assert remaining(clock) == 2
+    now[0] += 9.5
+    try:
+        remaining(clock)
+        raise AssertionError
+    except DeadlineExceeded:
+        pass
+assert _deadline.get() == float("inf")
+```
+
+The inner 30-second scope can't extend the outer 10-second deadline. Use `remaining()` to set per-call timeouts (`wait_for(llm(...), timeout=remaining())`) and to skip optional steps when time is short. Across services, propagate the deadline in a header (as gRPC does), so remote agents respect it too.
+F:
+- Which steps would you skip first when little time remains?
+
+@@ Human approval gate for side effects | Medium | Human-in-the-loop
+Q: Implement an approval gate: read tools execute immediately, while write tools create a pending approval ticket. The run pauses until a human resolves the ticket, and then the call is executed or the rejection is returned to the model.
+A:
+```python
+import itertools
+from typing import Callable
+
+
+class ApprovalGate:
+    def __init__(self, tools: dict[str, tuple[str, Callable]]) -> None:
+        self.tools = tools
+        self.pending: dict[int, dict] = {}
+        self._ids = itertools.count(1)
+
+    def request(self, name: str, args: dict, user: str) -> dict:
+        effect, fn = self.tools[name]
+        if effect == "read":
+            return {"status": "executed", "result": fn(**args)}
+        ticket = next(self._ids)
+        self.pending[ticket] = {"name": name, "args": args, "user": user}
+        return {"status": "pending_approval", "ticket": ticket,
+                "summary": f"{name}({', '.join(f'{k}={v}' for k, v in args.items())})"}
+
+    def resolve(self, ticket: int, approver: str, approved: bool, reason: str = "") -> dict:
+        req = self.pending.pop(ticket)
+        if approver == req["user"] and req["name"] == "release_payment":
+            raise PermissionError("four-eyes rule: requester cannot approve their own payment")
+        if not approved:
+            return {"status": "rejected", "reason": reason or "rejected by reviewer"}
+        _, fn = self.tools[req["name"]]
+        return {"status": "executed", "result": fn(**req["args"]), "approved_by": approver}
+
+
+sent: list[str] = []
+gate = ApprovalGate({"get_invoice": ("read", lambda invoice_id: {"id": invoice_id, "amount": "900.00"}),
+                     "release_payment": ("write", lambda invoice_id: sent.append(invoice_id) or f"PAID {invoice_id}")})
+assert gate.request("get_invoice", {"invoice_id": "INV-7"}, "priya")["status"] == "executed"
+pending = gate.request("release_payment", {"invoice_id": "INV-7"}, "priya")
+assert pending["status"] == "pending_approval" and sent == []
+assert gate.resolve(pending["ticket"], "tom", approved=True)["result"] == "PAID INV-7"
+t2 = gate.request("release_payment", {"invoice_id": "INV-8"}, "priya")["ticket"]
+try:
+    gate.resolve(t2, "priya", approved=True)
+    raise AssertionError
+except PermissionError:
+    pass
+```
+
+Show the approver exactly what will run (the tool and its concrete arguments), not the model's description of it. Persist pending tickets (the agent may wait hours). Enforce segregation of duties (four-eyes) for financial actions. LangGraph implements the pause with `interrupt()` and a checkpointer, and resumes with `Command(resume=...)`.
+F:
+- Why must the approver see the concrete arguments rather than the agent's summary?
+
+@@ Approve, edit or reject a tool call | Medium | Human-in-the-loop
+Q: Extend human review so the reviewer can approve, edit the arguments (re-validated against the tool schema), or reject with a reason that goes back to the agent.
+A:
+```python
+from decimal import Decimal
+from typing import Literal
+
+from pydantic import BaseModel, Field, ValidationError
+
+
+class EmailArgs(BaseModel):
+    to: str = Field(pattern=r"^[\w.+-]+@corp\.example$")
+    subject: str = Field(max_length=120)
+    body: str
+
+
+class RefundArgs(BaseModel):
+    order_id: str
+    amount: Decimal = Field(gt=0, le=Decimal("500"))
+
+
+SCHEMAS = {"send_email": EmailArgs, "issue_refund": RefundArgs}
+
+
+def apply_review(call: dict, decision: Literal["approve", "edit", "reject"], edits: dict | None = None,
+                 reason: str = "") -> dict:
+    if decision == "reject":
+        return {"action": "skip", "tool_message": f"The reviewer rejected {call['name']}: {reason}"}
+    args = {**call["args"], **(edits or {})} if decision == "edit" else call["args"]
+    try:
+        validated = SCHEMAS[call["name"]].model_validate(args)
+    except ValidationError as e:
+        return {"action": "invalid_edit", "error": e.errors()[0]["msg"]}
+    return {"action": "execute", "args": validated.model_dump()}
+
+
+call = {"name": "issue_refund", "args": {"order_id": "O-1", "amount": "450"}}
+assert apply_review(call, "approve")["args"]["amount"] == Decimal("450")
+assert apply_review(call, "edit", {"amount": "120"})["args"]["amount"] == Decimal("120")
+assert apply_review(call, "edit", {"amount": "5000"})["action"] == "invalid_edit"
+assert apply_review(call, "reject", reason="duplicate claim")["tool_message"].endswith("duplicate claim")
+```
+
+Edits must pass the same validation as model-generated arguments, since human edits can be wrong too. Returning the rejection reason to the agent lets it adapt its plan ("the refund was rejected as a duplicate claim; tell the user"). Log the original arguments, the edits and who made them.
+F:
+- Should edited calls be re-checked against authorisation rules as well?
+
+@@ Risk-tiered autonomy | Medium | Human-in-the-loop
+Q: Implement a policy that decides per tool call whether to auto-execute, require approval, or forbid it, based on the tool's category, the amount, and the user's role.
+A:
+```python
+from decimal import Decimal
+
+POLICY = {
+    "read": {"default": "auto"},
+    "communication": {"default": "approve", "internal_only_auto": True},
+    "payment": {"auto_limit": Decimal("0"), "approve_limit": Decimal("10000"), "roles": {"payments_ops"}},
+    "admin": {"default": "forbid"},
+}
+
+
+def decide(category: str, role: str, amount: Decimal | None = None, external: bool = False) -> str:
+    rule = POLICY.get(category, {"default": "forbid"})
+    if category == "payment":
+        if role not in rule["roles"] or amount is None:
+            return "forbid"
+        if amount <= rule["auto_limit"]:
+            return "auto"
+        return "approve" if amount <= rule["approve_limit"] else "forbid"
+    if category == "communication" and not external and rule.get("internal_only_auto"):
+        return "auto"
+    return rule["default"]
+
+
+assert decide("read", "analyst") == "auto"
+assert decide("communication", "analyst", external=False) == "auto"
+assert decide("communication", "analyst", external=True) == "approve"
+assert decide("payment", "payments_ops", Decimal("2500")) == "approve"
+assert decide("payment", "payments_ops", Decimal("25000")) == "forbid"
+assert decide("payment", "analyst", Decimal("10")) == "forbid"
+assert decide("admin", "payments_ops") == "forbid" and decide("unknown", "x") == "forbid"
+```
+
+Unknown categories fail closed. Keep the policy in configuration or a policy engine (OPA or Cedar style), reviewed by risk owners, versioned, and applied in code at the dispatcher, never in the prompt. Start new agents at low autonomy and raise limits as evaluation and incident history justify it.
+F:
+- What evidence would justify raising an agent's auto-execute limit?
+
+@@ Designing agent state | Medium | State management
+Q: What should an agent's state contain, and how do you design it so the agent is resumable, debuggable and safe?
+A:
+Contents:
+- Inputs: the task, the user identity and entitlement context (as a reference, not raw tokens), and configuration versions.
+- Conversation or messages (trimmed), and structured working state: the plan, completed steps and their results (or references to large results), open questions, and extracted facts.
+- Control fields: step count, budget used, status (running, waiting for approval, failed), pending approvals, retry counters.
+- Outputs: the final answer and artifacts, plus an action log.
+
+Design principles:
+- Prefer structured fields over parsing transcripts: reducers merge updates predictably (for example "append to messages", "overwrite status").
+- Keep it serialisable (JSON-safe), so it can be checkpointed, and small (store large blobs externally with references).
+- Never store secrets or raw credentials. Store handles.
+- Version the schema, so in-flight runs survive deployments.
+- Make updates explicit per step (a node returns a partial update), which makes the history auditable and time-travel debugging possible.
+F:
+- Why store references to large tool results rather than the results themselves?
+
+@@ Checkpoint and resume agent runs | Medium | Durability
+Q: Implement step-level checkpointing: persist the state after each step, and on restart resume from the last checkpoint without re-running completed side-effecting steps.
+A:
+```python
+import json
+from typing import Callable
+
+
+class CheckpointStore:
+    def __init__(self) -> None:
+        self.data: dict[str, str] = {}
+
+    def save(self, run_id: str, state: dict) -> None:
+        self.data[run_id] = json.dumps(state)
+
+    def load(self, run_id: str) -> dict | None:
+        raw = self.data.get(run_id)
+        return json.loads(raw) if raw else None
+
+
+def run_steps(run_id: str, steps: list[tuple[str, Callable[[dict], dict]]], store: CheckpointStore) -> dict:
+    state = store.load(run_id) or {"completed": [], "vars": {}}
+    for name, fn in steps:
+        if name in state["completed"]:
+            continue
+        state["vars"].update(fn(state["vars"]))
+        state["completed"].append(name)
+        store.save(run_id, state)
+    return state
+
+
+emails: list[str] = []
+crash = {"armed": True}
+
+
+def send_email(v: dict) -> dict:
+    emails.append(v["draft"])
+    return {"sent": True}
+
+
+def slow_step(v: dict) -> dict:
+    if crash["armed"]:
+        crash["armed"] = False
+        raise RuntimeError("pod evicted")
+    return {"archived": True}
+
+
+steps = [("draft", lambda v: {"draft": "Hello"}), ("send", send_email), ("archive", slow_step)]
+store = CheckpointStore()
+try:
+    run_steps("run-1", steps, store)
+except RuntimeError:
+    pass
+final = run_steps("run-1", steps, store)
+assert final["completed"] == ["draft", "send", "archive"] and emails == ["Hello"]
+```
+
+The email is sent exactly once even though the run crashed and restarted. The gap is a crash between executing a side effect and saving the checkpoint, which would re-send. Close it with idempotency keys on the side effect, or an outbox. LangGraph checkpointers (in-memory, SQLite, Postgres) provide the checkpoint-per-step part out of the box.
+F:
+- Where exactly is the remaining duplicate-send window, and how do you close it?
+
+@@ Durable execution for long-running agents | Medium | Durability
+Q: Some agent tasks take hours or days (waiting for approvals, polling external systems). What does "durable execution" mean, and what options exist?
+A:
+Durable execution means the workflow's progress survives process crashes, deployments and long waits: state is persisted after each step, and the workflow resumes exactly where it left off, often on a different machine, without redoing completed steps.
+
+Options:
+- Agent frameworks with persistence: LangGraph checkpointers (Postgres) plus a runtime that resumes threads, and its human-in-the-loop interrupts can wait indefinitely.
+- Workflow engines: Temporal, AWS Step Functions and Durable Functions on Azure provide timers, retries, signals (for approvals) and event-history replay. LLM calls become activities.
+- A queue plus a state store: simple jobs with explicit state machines in a database, driven by messages (SQS, Service Bus, Kafka).
+
+Requirements either way: idempotent steps, deterministic orchestration logic (important for replay-based engines), versioning for in-flight runs, visibility into run status, timeouts for waits, and cancellation.
+F:
+- Why must orchestration code be deterministic in replay-based engines such as Temporal?
+
+@@ Event-sourced agent state | Medium | State management
+Q: Model an agent run as an append-only event log, derive the current state by folding the events, and reconstruct the state at any earlier point for debugging.
+A:
+```python
+from functools import reduce
+
+
+def apply(state: dict, event: dict) -> dict:
+    kind = event["type"]
+    if kind == "task_started":
+        return {"status": "running", "task": event["task"], "steps": [], "answer": None}
+    if kind == "tool_called":
+        return {**state, "steps": state["steps"] + [event["tool"]]}
+    if kind == "approval_requested":
+        return {**state, "status": "waiting_approval"}
+    if kind == "approval_granted":
+        return {**state, "status": "running"}
+    if kind == "completed":
+        return {**state, "status": "done", "answer": event["answer"]}
+    raise ValueError(f"unknown event {kind}")
+
+
+def state_at(events: list[dict], upto: int | None = None) -> dict:
+    return reduce(apply, events[:upto], {})
+
+
+log = [{"type": "task_started", "task": "refund INV-7"}, {"type": "tool_called", "tool": "get_invoice"},
+       {"type": "approval_requested"}, {"type": "approval_granted"},
+       {"type": "tool_called", "tool": "issue_refund"}, {"type": "completed", "answer": "Refunded 90.00"}]
+assert state_at(log)["status"] == "done" and state_at(log)["steps"] == ["get_invoice", "issue_refund"]
+assert state_at(log, 3)["status"] == "waiting_approval"
+```
+
+Benefits: a complete audit trail (who, what, when), time-travel debugging, and rebuilding projections (dashboards, analytics) from the same log. Costs: schema evolution for events (upcasters), snapshots for long logs, and storage. It fits regulated environments well, because nothing is overwritten.
+F:
+- How would you handle an event type renamed in a later version?
+
+@@ Short-term versus long-term agent memory | Easy | Memory
+Q: Distinguish the kinds of memory an agent uses, and where each is stored.
+A:
+- Working (short-term) memory: the current run's messages, tool results and scratch state, held in the context window and in checkpointed state (for example a LangGraph thread). It is trimmed or summarised as it grows.
+- Episodic memory: records of past runs (task, actions, outcome, lessons), retrieved when a similar task appears ("last time, the vendor API needed the ISO date format").
+- Semantic memory: durable facts and preferences about the user or domain ("home office is Canary Wharf"), stored in a key-value or document store (for example the LangGraph Store), with namespaces per user.
+- Procedural memory: how to do things, such as system prompts, skills and tool descriptions, often versioned as code or configuration. Some systems let agents propose updates to it, with review.
+
+Design points: scope everything per user and tenant, add provenance and TTLs, let users see and delete their memories, retrieve memory selectively (not all of it every turn), and guard against poisoning (only write memories from trusted signals).
+F:
+- Which memory type is most dangerous to let the agent update itself?
+
+@@ Episodic memory retrieval for agents | Medium | Memory
+Q: Implement episodic memory: store past task episodes (the task, the outcome and a lesson learned) per user, and retrieve lessons from the most similar successful episodes to include as hints for a new task.
+A:
+```python
+import math
+import re
+from collections import Counter
+
+STOP = {"the", "a", "for", "to", "of", "and", "my", "in", "on"}
+
+
+def vec(text: str) -> Counter:
+    return Counter(w for w in re.findall(r"[a-z]+", text.lower()) if w not in STOP)
+
+
+def cos(a: Counter, b: Counter) -> float:
+    d = sum(a[k] * b[k] for k in a)
+    na, nb = math.sqrt(sum(v * v for v in a.values())), math.sqrt(sum(v * v for v in b.values()))
+    return d / (na * nb) if na and nb else 0.0
+
+
+class EpisodicMemory:
+    def __init__(self) -> None:
+        self.episodes: list[dict] = []
+
+    def add(self, user: str, task: str, success: bool, lesson: str) -> None:
+        self.episodes.append({"user": user, "task": task, "success": success, "lesson": lesson})
+
+    def hints(self, user: str, task: str, k: int = 2, min_sim: float = 0.3) -> list[str]:
+        q = vec(task)
+        scored = [(cos(q, vec(e["task"])), e["lesson"]) for e in self.episodes if e["user"] == user and e["success"]]
+        return [lesson for s, lesson in sorted(scored, reverse=True)[:k] if s >= min_sim]
+
+
+mem = EpisodicMemory()
+mem.add("priya", "rebook cancelled flight to Frankfurt", True, "Check fare class before rebooking; basic fares block changes.")
+mem.add("priya", "file quarterly expense report", True, "Attach receipts as PDF; the portal rejects images.")
+mem.add("tom", "rebook cancelled flight to Paris", True, "Tom prefers morning flights.")
+assert mem.hints("priya", "rebook my cancelled flight to Zurich") == [
+    "Check fare class before rebooking; basic fares block changes."]
+assert mem.hints("priya", "book a meeting room") == []
+```
+
+Other users' episodes are never retrieved. Use real embeddings in production, keep lessons short and reviewed (a bad lesson repeats forever), and let lessons expire when systems change.
+F:
+- How would you stop a wrong "lesson" from spreading across many future runs?
+
+@@ Scratchpads and working notes | Medium | Context engineering
+Q: What is an agent scratchpad or notes file, and why do long-running agents benefit from explicit note-taking?
+A:
+- A scratchpad is structured working memory the agent writes to deliberately: the goal, a plan with checkboxes, key findings with sources, decisions made, and open questions. It can be a state field or a file the agent reads and updates through tools.
+- Why it helps: long runs overflow the context. Trimming or summarising the transcript loses details, while a curated notes file keeps what matters. It reduces repeated work ("already checked the vendor API"), helps the agent resume after interruptions or handoffs, and gives humans a readable view of progress.
+- Practices: a fixed schema (goal, plan, facts, decisions, todo), size limits, updates at milestones rather than every step, citations for facts, and never storing secrets.
+
+Coding agents often use this pattern with a progress or todo file. Personal assistants use it for multi-day tasks.
+F:
+- What should happen to the scratchpad when a run finishes?
+
+@@ Summarise tool outputs between steps | Medium | Context engineering
+Q: Implement context compaction for an agent: keep the latest N tool results verbatim, and replace older ones with short summaries, so the context stays bounded without losing key facts.
+A:
+```python
+from typing import Callable
+
+
+def compact_tool_history(messages: list[dict], keep_recent: int, summarize: Callable[[str], str]) -> list[dict]:
+    tool_idx = [i for i, m in enumerate(messages) if m["role"] == "tool"]
+    old = set(tool_idx[:-keep_recent]) if keep_recent else set(tool_idx)
+    out = []
+    for i, m in enumerate(messages):
+        if i in old and not m.get("summarized"):
+            out.append({**m, "content": summarize(m["content"]), "summarized": True})
+        else:
+            out.append(m)
+    return out
+
+
+msgs = [{"role": "user", "content": "Investigate break BRK-9"},
+        {"role": "tool", "name": "get_trade", "content": "trade T1 qty 1000 px 101.2 ... (4,000 chars)"},
+        {"role": "tool", "name": "get_confirm", "content": "confirm C7 qty 1000 px 101.25 ... (3,000 chars)"},
+        {"role": "tool", "name": "get_fx", "content": "GBPUSD 1.2710"}]
+summ = lambda s: s.split("...")[0].strip()
+out = compact_tool_history(msgs, keep_recent=1, summarize=summ)
+assert out[1]["content"] == "trade T1 qty 1000 px 101.2" and out[1]["summarized"]
+assert out[3]["content"] == "GBPUSD 1.2710" and "summarized" not in out[3]
+assert compact_tool_history(out, 1, lambda s: "!!")[1]["content"] == "trade T1 qty 1000 px 101.2"
+```
+
+Already-summarised messages aren't summarised again, so repeated compaction doesn't erode them. Keep the full outputs in external state (referenced by id), so the agent can re-fetch details if a summary turns out to be insufficient. Summaries must preserve identifiers and numbers exactly.
+F:
+- How would you let the agent recover a detail lost in a summary?
+
+@@ Sub-agents to isolate context | Medium | Context engineering
+Q: Show how delegating a noisy sub-task to a sub-agent keeps the parent's context small: the sub-agent may make many tool calls, but only a concise result returns to the parent.
+A:
+```python
+from typing import Callable
+
+
+def research_subagent(question: str, search: Callable[[str], list[str]], max_calls: int = 5) -> dict:
+    notes, calls = [], 0
+    for q in [question, question + " exceptions", question + " effective date"][:max_calls]:
+        calls += 1
+        notes.extend(search(q))
+    unique = list(dict.fromkeys(notes))
+    return {"summary": "; ".join(unique[:3]), "sources": len(unique), "tool_calls": calls}
+
+
+def parent_agent(task: str, search: Callable[[str], list[str]]) -> list[dict]:
+    context = [{"role": "user", "content": task}]
+    result = research_subagent("UK hotel cap", search)
+    context.append({"role": "tool", "name": "research", "content": result["summary"]})
+    return context
+
+
+corpus = {"UK hotel cap": ["London cap 180 GBP [pol-7]", "Rest of UK 120 GBP [pol-7]"],
+          "UK hotel cap exceptions": ["Director approval above cap [pol-7]"],
+          "UK hotel cap effective date": ["Effective 2026-04-01 [pol-7]"]}
+ctx = parent_agent("Draft a travel note", lambda q: corpus.get(q, []))
+assert len(ctx) == 2 and ctx[1]["content"].startswith("London cap 180 GBP")
+assert research_subagent("UK hotel cap", lambda q: corpus.get(q, []))["tool_calls"] == 3
+```
+
+Three searches and four raw results collapse into one line in the parent's context. This improves focus and cost, and keeps parallel sub-agents independent. The risk is information loss in the summary, so return structured results with citations, and let the parent ask follow-up questions.
+F:
+- When would you pass the sub-agent's full transcript back instead?
+
+@@ Token and cost budget manager | Medium | Cost control
+Q: Implement a per-run budget manager: reserve an estimated cost before each LLM or tool call, commit the actual cost afterwards (releasing the unused reservation), and refuse calls that would exceed the budget.
+A:
+```python
+from decimal import Decimal
+
+
+class BudgetExceeded(Exception):
+    pass
+
+
+class Budget:
+    def __init__(self, limit: Decimal) -> None:
+        self.limit, self.spent, self.reserved = limit, Decimal("0"), Decimal("0")
+
+    def reserve(self, estimate: Decimal) -> Decimal:
+        if self.spent + self.reserved + estimate > self.limit:
+            raise BudgetExceeded(f"need {estimate}, remaining {self.limit - self.spent - self.reserved}")
+        self.reserved += estimate
+        return estimate
+
+    def commit(self, reservation: Decimal, actual: Decimal) -> None:
+        self.reserved -= reservation
+        self.spent += actual
+
+    @property
+    def remaining(self) -> Decimal:
+        return self.limit - self.spent - self.reserved
+
+
+b = Budget(Decimal("0.10"))
+r1 = b.reserve(Decimal("0.04"))
+b.commit(r1, Decimal("0.03"))
+r2 = b.reserve(Decimal("0.05"))
+assert b.remaining == Decimal("0.02")
+try:
+    b.reserve(Decimal("0.03"))
+    raise AssertionError
+except BudgetExceeded:
+    pass
+b.commit(r2, Decimal("0.05"))
+assert b.spent == Decimal("0.08") and b.remaining == Decimal("0.02")
+```
+
+Reserving before the call (prompt tokens plus `max_tokens` at list price) stops parallel calls from overshooting together. When the budget runs low, degrade gracefully: switch to a cheaper model, skip optional steps, or wrap up with the best answer so far. Record the per-run cost in traces.
+F:
+- What should the agent do when it has 10% of its budget left and isn't finished?
+
+@@ Choose a model per step | Medium | Cost control
+Q: Implement step-level model routing: cheap models for routing and extraction, strong models for planning and synthesis, with escalation to the next tier when a step's output fails validation.
+A:
+```python
+from typing import Callable
+
+TIERS = ["small", "medium", "large"]
+DEFAULT_TIER = {"route": "small", "extract": "small", "plan": "large", "synthesize": "medium"}
+
+
+def run_step(step: str, payload: str, models: dict[str, Callable[[str], str]],
+             valid: Callable[[str], bool]) -> tuple[str, str]:
+    start = TIERS.index(DEFAULT_TIER.get(step, "medium"))
+    for tier in TIERS[start:]:
+        out = models[tier](payload)
+        if valid(out):
+            return tier, out
+    raise RuntimeError(f"step {step} failed validation at every tier")
+
+
+models = {"small": lambda p: "garbage" if "tricky" in p else '{"amount": "10.00"}',
+          "medium": lambda p: '{"amount": "10.00"}', "large": lambda p: '{"amount": "10.00"}'}
+is_json = lambda s: s.startswith("{")
+assert run_step("extract", "simple receipt", models, is_json) == ("small", '{"amount": "10.00"}')
+assert run_step("extract", "tricky receipt", models, is_json)[0] == "medium"
+assert run_step("plan", "anything", models, is_json)[0] == "large"
+```
+
+Validation-driven escalation only pays when there is a reliable validator (a schema, business rules or tests). Log the escalation rate per step: a high rate means the default tier is wrong for that step, and you're paying for two calls.
+F:
+- When is it cheaper to always use the larger model for a step?
+
+@@ Final answer schema for agents | Medium | Structured output
+Q: Define a structured final answer for an agent: the answer text, evidence tied to real tool-call ids, the actions taken, and a confidence level. Validate that the evidence references calls that actually happened.
+A:
+```python
+from typing import Literal
+
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
+
+
+class Evidence(BaseModel):
+    tool_call_id: str
+    quote: str = Field(min_length=3)
+
+
+class AgentAnswer(BaseModel):
+    answer: str
+    evidence: list[Evidence] = Field(min_length=1)
+    actions_taken: list[str] = []
+    confidence: Literal["high", "medium", "low"]
+
+    @field_validator("evidence")
+    @classmethod
+    def evidence_exists(cls, v: list[Evidence], info: ValidationInfo) -> list[Evidence]:
+        calls = (info.context or {}).get("tool_calls", {})
+        for e in v:
+            if e.tool_call_id not in calls:
+                raise ValueError(f"unknown tool call {e.tool_call_id}")
+            if e.quote.lower() not in calls[e.tool_call_id].lower():
+                raise ValueError(f"quote not found in output of {e.tool_call_id}")
+        return v
+
+
+calls = {"call_1": "Booking BK-9 status: CANCELLED by airline at 06:10", "call_2": "Rebooked on LH903 dep 14:05"}
+raw = {"answer": "Your 07:00 flight was cancelled; you're on LH903 at 14:05.",
+       "evidence": [{"tool_call_id": "call_1", "quote": "CANCELLED by airline"},
+                    {"tool_call_id": "call_2", "quote": "LH903 dep 14:05"}],
+       "actions_taken": ["rebook"], "confidence": "high"}
+ans = AgentAnswer.model_validate(raw, context={"tool_calls": calls})
+assert ans.confidence == "high"
+bad = {**raw, "evidence": [{"tool_call_id": "call_2", "quote": "LH905 dep 09:00"}]}
+try:
+    AgentAnswer.model_validate(bad, context={"tool_calls": calls})
+    raise AssertionError
+except ValueError:
+    pass
+```
+
+Pydantic's validation context lets the validator check against the run's real tool outputs, so the agent can't cite evidence it never saw. This makes answers auditable and powers UI features such as "show me where this came from".
+F:
+- How would you verify that `actions_taken` matches the action log?
+
+@@ Stop conditions for agents | Easy | Agent control
+Q: List the stop conditions a production agent needs, and what it should return in each case.
+A:
+- Success: the model produces a final answer that passes validation. Return the answer, evidence and actions.
+- Needs input: missing information or ambiguity. Ask the user a specific question and pause (persist the state).
+- Needs approval: a pending side effect. Pause with an approval request.
+- Budget exhausted: the step, token, cost or time limit is reached. Return partial results with an honest "couldn't finish" and what's left.
+- No progress: repeated calls, cycles, or the same failure after re-planning. Stop, summarise attempts, and escalate.
+- Policy stop: a guardrail blocked an action, or the request is out of scope. Refuse with an explanation or a redirect.
+- Fatal error: a dependency is down (circuit open) or there is an internal error. Return a graceful error with a trace id, and alert if it's systemic.
+- User cancellation: stop immediately, cancel in-flight calls, and record the state.
+
+Each stop reason should be a machine-readable status in the response and in traces, so dashboards show why runs end.
+F:
+- Which stop reasons should page an on-call engineer?
+
+@@ Agent failure modes and recovery | Medium | Reliability
+Q: What are the common ways agents fail in production, and what recovery strategy fits each?
+A:
+- Wrong tool or arguments: validate the arguments, return actionable errors, improve tool descriptions, and reduce the tool set per task.
+- Hallucinated results or claims: require evidence tied to tool outputs, verify numbers against tool results, and use structured final answers.
+- Loops and no progress: step and repetition guards, cycle detection with a reflection prompt, and re-planning caps.
+- Tool and dependency failures: retries with backoff for transient errors, circuit breakers, fallbacks (an alternative tool), and graceful degradation.
+- Partial side effects: sagas with compensation, idempotency keys and outboxes.
+- Context overflow and drift: compaction, sub-agents, and re-injecting the goal and constraints.
+- Prompt injection from tool outputs: least privilege, approvals, isolating untrusted content, and output filtering.
+- Premature completion ("done!" when it isn't): verifiers and final-state checks.
+- Over-asking the user: better defaults, and clarifying only when it changes the outcome.
+
+Track each failure mode as a labelled category in error analysis, and target the biggest bucket.
+F:
+- Which failure mode is hardest to detect automatically?
+
+@@ Return tool errors the model can act on | Medium | Tooling
+Q: Map tool exceptions to model-facing error messages that say whether to retry, what to change, and which tool might help, without leaking internals.
+A:
+```python
+class NotFound(Exception):
+    pass
+
+
+class RateLimited(Exception):
+    pass
+
+
+HINTS = {
+    NotFound: (False, "The item doesn't exist. Check the id, or call list_accounts to see valid ids."),
+    PermissionError: (False, "The user isn't allowed to do this. Explain that to the user; don't retry."),
+    RateLimited: (True, "The service is busy. Wait and retry once, or continue without this data."),
+    ValueError: (False, "The arguments were invalid. Fix them using the tool schema and try again."),
+}
+
+
+def model_facing_error(tool: str, exc: Exception) -> dict:
+    for exc_type, (retryable, hint) in HINTS.items():
+        if isinstance(exc, exc_type):
+            return {"tool": tool, "ok": False, "error_type": exc_type.__name__, "retryable": retryable,
+                    "message": str(exc)[:150], "hint": hint}
+    return {"tool": tool, "ok": False, "error_type": "InternalError", "retryable": False,
+            "message": "The tool failed unexpectedly.", "hint": "Tell the user the system had a problem."}
+
+
+e = model_facing_error("get_balance", NotFound("account ACC-9 not found"))
+assert e["error_type"] == "NotFound" and "list_accounts" in e["hint"] and not e["retryable"]
+assert model_facing_error("x", RateLimited("429"))["retryable"]
+internal = model_facing_error("x", KeyError("db_password"))
+assert "db_password" not in str(internal) and internal["error_type"] == "InternalError"
+```
+
+Unknown exceptions return a generic message, so internal details (such as a leaked `KeyError('db_password')`) never reach the model or the user. The full exception goes to logs and traces. Good hints noticeably improve agent recovery rates.
+F:
+- How would you measure whether better hints improved recovery?
+
+@@ Business-rule validation for tool arguments | Medium | Tooling
+Q: Schema validation says the transfer arguments are well-formed. Implement the business-rule checks (daily limit remaining, currency matching the account, same-day cut-off time) that must also pass before execution.
+A:
+```python
+from datetime import time
+from decimal import Decimal
+
+
+def transfer_violations(args: dict, account: dict, used_today: Decimal, now: time,
+                        cutoff: time = time(16, 30)) -> list[str]:
+    problems = []
+    amount = Decimal(args["amount"])
+    if amount <= 0:
+        problems.append("amount must be positive")
+    if used_today + amount > account["daily_limit"]:
+        problems.append(f"exceeds daily limit: {account['daily_limit'] - used_today} remaining")
+    if args["currency"] != account["currency"]:
+        problems.append(f"account currency is {account['currency']}, not {args['currency']}")
+    if args.get("same_day") and now > cutoff:
+        problems.append(f"same-day cut-off {cutoff:%H:%M} has passed")
+    return problems
+
+
+acct = {"id": "ACC-1", "currency": "GBP", "daily_limit": Decimal("10000")}
+ok = {"amount": "2500.00", "currency": "GBP", "same_day": True}
+assert transfer_violations(ok, acct, Decimal("5000"), time(11, 0)) == []
+bad = {"amount": "6000.00", "currency": "EUR", "same_day": True}
+assert transfer_violations(bad, acct, Decimal("5000"), time(17, 0)) == [
+    "exceeds daily limit: 5000 remaining", "account currency is GBP, not EUR", "same-day cut-off 16:30 has passed"]
+```
+
+These rules belong in the system of record's API as the source of truth. Checking them in the tool too gives the agent early, explainable feedback. Return all violations at once, so the agent can fix everything in one retry or explain to the user.
+F:
+- Why should these checks also exist in the downstream payments API?
+
+@@ Authorisation checks inside tools | Hard | Security
+Q: A tool receives `account_id` from the model. Implement authorisation that derives the user from the authenticated session (never from model arguments) and checks ownership or entitlement before returning data.
+A:
+```python
+from dataclasses import dataclass
+
+
+@dataclass(frozen=True)
+class Session:
+    user_id: str
+    roles: frozenset[str]
+
+
+ENTITLEMENTS = {"u-priya": {"ACC-1", "ACC-2"}, "u-tom": {"ACC-3"}}
+BALANCES = {"ACC-1": "1,200.00 GBP", "ACC-2": "90.00 GBP", "ACC-3": "5,000.00 GBP"}
+
+
+def get_balance(session: Session, account_id: str, on_behalf_of: str | None = None) -> str:
+    if on_behalf_of is not None and on_behalf_of != session.user_id and "support_agent" not in session.roles:
+        raise PermissionError("cannot act on behalf of another user")
+    subject = on_behalf_of or session.user_id
+    if account_id not in ENTITLEMENTS.get(subject, set()):
+        raise PermissionError(f"no access to {account_id}")
+    return BALANCES[account_id]
+
+
+priya = Session("u-priya", frozenset({"employee"}))
+assert get_balance(priya, "ACC-1") == "1,200.00 GBP"
+for attack in ({"account_id": "ACC-3"}, {"account_id": "ACC-3", "on_behalf_of": "u-tom"}):
+    try:
+        get_balance(priya, **attack)
+        raise AssertionError(attack)
+    except PermissionError:
+        pass
+support = Session("u-sam", frozenset({"support_agent"}))
+assert get_balance(support, "ACC-3", on_behalf_of="u-tom") == "5,000.00 GBP"
+```
+
+The session is injected by the platform (from the validated token), never supplied or influenced by the model. That defeats prompt-injected requests like "get the balance of ACC-3 for user u-tom". In production, call the system of record with an on-behalf-of token (OAuth token exchange), so it enforces entitlements itself, and log the access.
+F:
+- Why is an on-behalf-of token better than a service account with broad access?
+
+@@ Scope tools to the task with capability tokens | Medium | Security
+Q: Implement per-run capability tokens: when a run starts, issue a token listing exactly the tools (and argument constraints) this task needs. The dispatcher rejects anything outside it, even if the model asks.
+A:
+```python
+import hashlib
+import hmac
+import json
+
+SECRET = b"rotate-me-in-a-vault"
+
+
+def issue_capability(run_id: str, tools: dict[str, dict]) -> str:
+    body = json.dumps({"run": run_id, "tools": tools}, sort_keys=True)
+    sig = hmac.new(SECRET, body.encode(), hashlib.sha256).hexdigest()
+    return body + "." + sig
+
+
+def authorize(token: str, tool: str, args: dict) -> None:
+    body, sig = token.rsplit(".", 1)
+    if not hmac.compare_digest(sig, hmac.new(SECRET, body.encode(), hashlib.sha256).hexdigest()):
+        raise PermissionError("invalid capability token")
+    caps = json.loads(body)["tools"]
+    if tool not in caps:
+        raise PermissionError(f"{tool} not in this run's capabilities")
+    for key, allowed in caps[tool].items():
+        if args.get(key) not in allowed:
+            raise PermissionError(f"{tool}.{key}={args.get(key)!r} not permitted")
+
+
+token = issue_capability("run-77", {"search_flights": {}, "hold_seat": {"booking_ref": ["BK-9"]}})
+authorize(token, "search_flights", {"origin": "LHR"})
+authorize(token, "hold_seat", {"booking_ref": "BK-9"})
+for tool, args in (("issue_refund", {}), ("hold_seat", {"booking_ref": "BK-1"})):
+    try:
+        authorize(token, tool, args)
+        raise AssertionError((tool, args))
+    except PermissionError:
+        pass
+tampered = token.replace('"BK-9"', '"BK-1"')
+try:
+    authorize(tampered, "hold_seat", {"booking_ref": "BK-1"})
+    raise AssertionError
+except PermissionError as e:
+    assert "invalid" in str(e)
+```
+
+A rebooking run for BK-9 can only touch BK-9, even if a malicious email convinces the model to try another booking. The HMAC signature stops tampering. Use `hmac.compare_digest` to avoid timing leaks, keep the keys in a vault, and add expiry to real tokens.
+F:
+- How is this similar to OAuth scopes, and how is it different?
+
+@@ Sandboxed code execution tool | Hard | Tooling
+Q: Implement a code-execution tool that runs model-written Python in a separate isolated interpreter process with a timeout, a cleared environment and capped output. Explain why a subprocess alone is not a sufficient sandbox.
+A:
+```python
+import subprocess
+import sys
+
+
+def run_python(code: str, timeout: float = 2.0, max_output: int = 2_000) -> dict:
+    try:
+        proc = subprocess.run([sys.executable, "-I", "-c", code], capture_output=True, text=True, timeout=timeout,
+                              env={"PYTHONIOENCODING": "utf-8", "SYSTEMROOT": __import__("os").environ.get("SYSTEMROOT", "")})
+    except subprocess.TimeoutExpired:
+        return {"ok": False, "error": f"timed out after {timeout}s"}
+    out = (proc.stdout + proc.stderr)[:max_output]
+    return {"ok": proc.returncode == 0, "exit_code": proc.returncode, "output": out}
+
+
+assert run_python("print(sum(range(10)))") == {"ok": True, "exit_code": 0, "output": "45\n"}
+assert run_python("while True: pass", timeout=1.0)["error"].startswith("timed out")
+leak = run_python("import os; print(os.environ.get('OPENAI_API_KEY'))")
+assert leak["output"].strip() == "None"
+assert not run_python("raise SystemExit(3)")["ok"]
+```
+
+`-I` is isolated mode: it ignores environment variables and the user site-packages. The cleared `env` keeps secrets out of the child (`SYSTEMROOT` is only there because Windows needs it). The timeout stops runaway loops.
+
+A subprocess still runs as the same OS user, with filesystem and network access. Production sandboxes use containers or microVMs (gVisor, Firecracker, managed code interpreters) with no network (or an egress allowlist), a read-only filesystem plus a scratch directory, CPU, memory and process limits, non-root users, and per-run disposal. Treat all model-written code as untrusted.
+F:
+- What resources must a production code sandbox limit besides time?
+
+@@ Computer-use and browser agents | Medium | Agent types
+Q: What are computer-use (GUI) agents, and what extra risks and controls do they need compared with API-based agents?
+A:
+- They perceive the screen (screenshots, the accessibility tree or the DOM) and act with mouse, keyboard or browser automation. They are used where no API exists: legacy apps, web portals, internal tools.
+- Loop: perceive, then decide, then act, then verify that the screen changed as expected.
+
+Extra risks:
+- Brittleness: UI changes, pop-ups and timing issues. Actions may land on the wrong element.
+- Prompt injection from anything visible on screen (web pages, emails, documents).
+- Broad privileges: the agent inherits the session's full access.
+- Irreversible clicks (submit, pay, delete), and data exfiltration through form fields or URLs.
+
+Controls: run in isolated VMs or browser profiles with minimal logged-in access, domain allowlists, a confirm step before submit, pay or delete actions, screenshots in the audit log, verification after each action, step limits, and a preference for APIs wherever they exist. Evaluate on recorded, versioned UI environments.
+F:
+- Why should you prefer an API even when a computer-use agent can do the task?
+
+@@ Perceive, act, verify loop | Medium | Agent types
+Q: Implement a perceive-act-verify loop for a GUI-style agent: act, re-perceive, and check the expected change happened, retrying a bounded number of times before failing clearly.
+A:
+```python
+from typing import Callable
+
+
+def act_and_verify(perceive: Callable[[], dict], act: Callable[[dict], None], action: dict,
+                   expect: Callable[[dict, dict], bool], retries: int = 2) -> dict:
+    for attempt in range(1, retries + 2):
+        before = perceive()
+        act(action)
+        after = perceive()
+        if expect(before, after):
+            return {"ok": True, "attempts": attempt}
+    return {"ok": False, "attempts": retries + 1, "last_screen": after}
+
+
+screen = {"page": "form", "fields": {}, "submitted": False}
+flaky = {"misses": 1}
+
+
+def perceive() -> dict:
+    return {"page": screen["page"], "fields": dict(screen["fields"]), "submitted": screen["submitted"]}
+
+
+def act(a: dict) -> None:
+    if a["type"] == "type":
+        if flaky["misses"]:
+            flaky["misses"] -= 1
+            return
+        screen["fields"][a["field"]] = a["text"]
+
+
+res = act_and_verify(perceive, act, {"type": "type", "field": "amount", "text": "250.00"},
+                     lambda b, a: a["fields"].get("amount") == "250.00")
+assert res == {"ok": True, "attempts": 2}
+never = act_and_verify(perceive, lambda a: None, {"type": "click", "target": "submit"},
+                       lambda b, a: a["submitted"], retries=1)
+assert not never["ok"] and never["attempts"] == 2
+```
+
+The first keystroke "missed" (as happens with real UIs), and verification caught it. Without verification, agents report success for actions that never happened. The same verify-after-act discipline applies to API agents: re-read the booking after rebooking.
+F:
+- How would you verify an action whose effect only appears asynchronously?
+
+@@ Queue-triggered agents | Medium | Event-driven agents
+Q: Implement an agent worker that consumes messages from a queue: deduplicate by message id (at-least-once delivery), retry failures, and move a message to a dead-letter queue after N failed attempts.
+A:
+```python
+from collections import deque
+from typing import Callable
+
+
+def run_worker(queue: deque, handle: Callable[[dict], None], max_attempts: int = 3) -> dict:
+    processed: set[str] = set()
+    dlq, attempts = [], {}
+    while queue:
+        msg = queue.popleft()
+        if msg["id"] in processed:
+            continue
+        try:
+            handle(msg)
+            processed.add(msg["id"])
+        except Exception as e:
+            attempts[msg["id"]] = attempts.get(msg["id"], 0) + 1
+            if attempts[msg["id"]] >= max_attempts:
+                dlq.append({**msg, "error": str(e)})
+            else:
+                queue.append(msg)
+    return {"processed": sorted(processed), "dlq": dlq}
+
+
+handled: list[str] = []
+
+
+def handle(msg: dict) -> None:
+    if msg["body"] == "poison":
+        raise ValueError("unparseable break record")
+    handled.append(msg["id"])
+
+
+q = deque([{"id": "m1", "body": "break BRK-1"}, {"id": "m2", "body": "poison"}, {"id": "m1", "body": "break BRK-1"},
+           {"id": "m3", "body": "break BRK-3"}])
+out = run_worker(q, handle)
+assert out["processed"] == ["m1", "m3"] and handled == ["m1", "m3"]
+assert out["dlq"][0]["id"] == "m2" and "unparseable" in out["dlq"][0]["error"]
+```
+
+The duplicate delivery of m1 is ignored. Real brokers (SQS, Service Bus, Kafka consumer groups) handle redelivery and dead-lettering. Your job is idempotent handling (a persisted processed-id store, or idempotency keys downstream), visibility timeouts longer than the agent run, and DLQ monitoring with a replay tool.
+F:
+- What goes wrong if the visibility timeout is shorter than the agent's run time?
+
+@@ Scheduled and background agents | Medium | Event-driven agents
+Q: A personal assistant should run background jobs (a morning briefing, monitoring subscriptions for price rises). What changes when an agent runs without a user present?
+A:
+- Identity: the job acts on behalf of the user with delegated, scoped credentials (refresh tokens with limited scopes), not a shared service account. Re-check consent and entitlements on each run.
+- No live approval: anything needing confirmation becomes a notification ("I found a price rise; cancel the subscription?") rather than an action. Only pre-authorised low-risk actions run automatically.
+- Durability: scheduled triggers (cron, EventBridge, Logic Apps), durable state, retries, and idempotency (a job must not run twice for the same slot).
+- Cost and fairness: per-user budgets, and jitter so millions of 07:00 briefings don't hit providers at the same second.
+- Notifications: deduplicate, throttle, respect quiet hours, and give clear explanations with a one-click undo or opt-out.
+- Observability: per-job status, failure alerts, and user-visible history ("what did my assistant do today?").
+F:
+- How would you prevent a background agent from spamming a user after a bug?
+
+@@ Locks when agents share resources | Medium | Concurrency
+Q: Two agent runs may update the same account concurrently. Implement per-key async locks so updates to the same key are serialised, while different keys proceed in parallel.
+A:
+```python
+import asyncio
+from collections import defaultdict
+
+
+class KeyedLocks:
+    def __init__(self) -> None:
+        self._locks: dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+    def __call__(self, key: str) -> asyncio.Lock:
+        return self._locks[key]
+
+
+balances = {"ACC-1": 100, "ACC-2": 100}
+locks = KeyedLocks()
+concurrent_keys: list[set[str]] = []
+active: set[str] = set()
+
+
+async def debit(account: str, amount: int) -> None:
+    async with locks(account):
+        active.add(account)
+        concurrent_keys.append(set(active))
+        current = balances[account]
+        await asyncio.sleep(0.01)
+        balances[account] = current - amount
+        active.discard(account)
+
+
+async def main() -> None:
+    await asyncio.gather(*(debit("ACC-1", 10) for _ in range(5)), *(debit("ACC-2", 5) for _ in range(5)))
+
+
+asyncio.run(main())
+assert balances == {"ACC-1": 50, "ACC-2": 75}
+assert any(s == {"ACC-1", "ACC-2"} for s in concurrent_keys)
+```
+
+Without the lock, the read-sleep-write sequence would lose updates. In-process locks only protect one process. Across replicas, use database transactions (`SELECT … FOR UPDATE`), optimistic concurrency (next question) or a distributed lock with leases (and fencing tokens, because leases can expire mid-operation).
+F:
+- Why do distributed locks need fencing tokens?
+
+@@ Optimistic concurrency for agent writes | Medium | Concurrency
+Q: Implement optimistic concurrency control for an agent that edits a shared document or record: writes include the version they read, conflicting writes are rejected, and the agent re-reads and retries.
+A:
+```python
+class VersionConflict(Exception):
+    pass
+
+
+class Store:
+    def __init__(self) -> None:
+        self.data = {"doc-1": {"version": 1, "text": "Draft v1"}}
+
+    def read(self, key: str) -> dict:
+        return dict(self.data[key])
+
+    def write(self, key: str, text: str, expected_version: int) -> int:
+        cur = self.data[key]
+        if cur["version"] != expected_version:
+            raise VersionConflict(f"expected v{expected_version}, found v{cur['version']}")
+        self.data[key] = {"version": cur["version"] + 1, "text": text}
+        return cur["version"] + 1
+
+
+def agent_update(store: Store, key: str, edit, retries: int = 3) -> int:
+    for _ in range(retries):
+        snapshot = store.read(key)
+        try:
+            return store.write(key, edit(snapshot["text"]), snapshot["version"])
+        except VersionConflict:
+            continue
+    raise RuntimeError("gave up after repeated conflicts")
+
+
+s = Store()
+snapshot = s.read("doc-1")
+s.write("doc-1", "Draft v1 + human edit", 1)
+try:
+    s.write("doc-1", "agent overwrite", snapshot["version"])
+    raise AssertionError
+except VersionConflict:
+    pass
+new_version = agent_update(s, "doc-1", lambda t: t + " + agent summary")
+assert new_version == 3 and s.read("doc-1")["text"] == "Draft v1 + human edit + agent summary"
+```
+
+The agent's first write would have silently erased a human's edit. With versioning it re-reads and applies its change on top. HTTP APIs express this with ETags and `If-Match`, and databases with a version column in the `WHERE` clause. Re-run the model step on the fresh content if the edit depends on it.
+F:
+- When is optimistic concurrency a bad fit?
+
+@@ Transactional outbox for agent side effects | Hard | Reliability
+Q: An agent step must update its state and send a notification atomically. Implement the transactional outbox pattern with SQLite: write the state change and an outbox row in one transaction, then a relay publishes pending rows and marks them sent.
+A:
+```python
+import json
+import sqlite3
+
+db = sqlite3.connect(":memory:")
+db.executescript("""
+CREATE TABLE runs(run_id TEXT PRIMARY KEY, status TEXT);
+CREATE TABLE outbox(id INTEGER PRIMARY KEY AUTOINCREMENT, topic TEXT, payload TEXT, sent INTEGER DEFAULT 0);
+INSERT INTO runs VALUES ('run-1', 'running');
+""")
+
+
+def complete_step(run_id: str, fail_after_update: bool = False) -> None:
+    with db:
+        db.execute("UPDATE runs SET status = 'rebooked' WHERE run_id = ?", (run_id,))
+        if fail_after_update:
+            raise RuntimeError("crash mid-transaction")
+        db.execute("INSERT INTO outbox(topic, payload) VALUES (?, ?)",
+                   ("notifications", json.dumps({"run_id": run_id, "msg": "You're rebooked on LH903"})))
+
+
+def relay(publish) -> int:
+    rows = db.execute("SELECT id, topic, payload FROM outbox WHERE sent = 0 ORDER BY id").fetchall()
+    for row_id, topic, payload in rows:
+        publish(topic, json.loads(payload))
+        with db:
+            db.execute("UPDATE outbox SET sent = 1 WHERE id = ?", (row_id,))
+    return len(rows)
+
+
+try:
+    complete_step("run-1", fail_after_update=True)
+except RuntimeError:
+    pass
+assert db.execute("SELECT status FROM runs").fetchone() == ("running",)
+complete_step("run-1")
+published: list = []
+assert relay(lambda t, p: published.append((t, p))) == 1 and relay(lambda t, p: published.append((t, p))) == 0
+assert published == [("notifications", {"run_id": "run-1", "msg": "You're rebooked on LH903"})]
+```
+
+The crashed attempt rolled back both writes: no state change without its notification, and vice versa. The relay gives at-least-once delivery (a crash between publish and marking sent means a resend), so consumers deduplicate by outbox id. At scale, change-data-capture (Debezium) can replace the polling relay.
+F:
+- Why not just send the notification directly after committing the state?
+
+@@ Escalate to a human with context | Medium | Human-in-the-loop
+Q: Implement escalation from an agent to a human queue: decide when to escalate, and build a ticket with a concise summary, what was tried, the evidence, and a suggested next step, so the human doesn't start from zero.
+A:
+```python
+def should_escalate(run: dict) -> str | None:
+    if run["user_requested_human"]:
+        return "user_request"
+    if run["confidence"] == "low":
+        return "low_confidence"
+    if run["policy_blocked"]:
+        return "policy"
+    if run["failed_attempts"] >= 2:
+        return "repeated_failure"
+    return None
+
+
+def build_ticket(run: dict, reason: str) -> dict:
+    return {
+        "reason": reason,
+        "customer_ref": run["customer_ref"],
+        "summary": run["goal"],
+        "tried": [f"{s['tool']}: {s['outcome']}" for s in run["steps"]],
+        "evidence": run["evidence"][:3],
+        "suggested_next_step": run.get("suggestion", "Review and contact the customer"),
+        "priority": "high" if reason in ("policy", "repeated_failure") else "normal",
+    }
+
+
+run = {"user_requested_human": False, "confidence": "medium", "policy_blocked": False, "failed_attempts": 2,
+       "customer_ref": "CUS-88", "goal": "Rebook cancelled FRA flight for tomorrow morning",
+       "steps": [{"tool": "search_flights", "outcome": "3 options"}, {"tool": "rebook", "outcome": "fare class blocks change"},
+                 {"tool": "rebook", "outcome": "fare class blocks change"}],
+       "evidence": ["Fare class: BASIC (non-changeable)"], "suggestion": "Request an airline waiver"}
+reason = should_escalate(run)
+ticket = build_ticket(run, reason)
+assert reason == "repeated_failure" and ticket["priority"] == "high"
+assert ticket["tried"][1] == "rebook: fare class blocks change" and ticket["suggested_next_step"] == "Request an airline waiver"
+```
+
+Include references rather than raw personal data, and link to the trace. Tell the user what's happening and the expected response time. Measure the escalation rate and how often humans overturn the agent's suggestion, which is a strong quality signal.
+F:
+- How would you use human resolutions to improve the agent over time?
+
+@@ Proposer and critic agents | Medium | Multi-agent
+Q: Implement a proposer-critic loop in which the critic checks the proposal against tool evidence (not just opinion) and the proposer revises until the critic finds no issues, with a round cap.
+A:
+```python
+import re
+from typing import Callable
+
+
+def propose_and_critique(task: str, propose: Callable[[str, list[str]], str], evidence: dict[str, str],
+                         max_rounds: int = 3) -> dict:
+    issues: list[str] = []
+    history = []
+    for rnd in range(1, max_rounds + 1):
+        proposal = propose(task, issues)
+        issues = [f"{k} should be {v}" for k, v in evidence.items()
+                  if (m := re.search(rf"{k}\s*[:=]\s*([\w.]+)", proposal)) and m.group(1) != v]
+        history.append({"round": rnd, "proposal": proposal, "issues": issues})
+        if not issues:
+            return {"accepted": proposal, "rounds": rnd, "history": history}
+    return {"accepted": None, "rounds": max_rounds, "history": history}
+
+
+def proposer(task: str, issues: list[str]) -> str:
+    fx = "1.30"
+    for issue in issues:
+        if issue.startswith("fx"):
+            fx = issue.split()[-1]
+    return f"Convert 100 GBP: fx={fx}, total={float(fx) * 100:.2f} USD"
+
+
+out = propose_and_critique("convert", proposer, {"fx": "1.2710"})
+assert out["rounds"] == 2 and out["accepted"].startswith("Convert 100 GBP: fx=1.2710, total=127.10")
+```
+
+A critic grounded in evidence (tool results, tests, source documents) catches real errors. An ungrounded critic mostly generates stylistic churn. Use a different model or prompt for the critic, keep the round count small, and log disagreements for evaluation.
+F:
+- When does adding a critic reduce accuracy?
+
+@@ Verify agent outputs before returning | Medium | Verification
+Q: Before an agent answers, verify it: every number in the answer must appear in some tool output, and every action it claims must appear in the action log. Return the issues found.
+A:
+```python
+import re
+
+
+def verify_answer(answer: str, tool_outputs: list[str], action_log: list[str], claimed_actions: list[str]) -> list[str]:
+    issues = []
+    haystack = " ".join(tool_outputs)
+    for num in re.findall(r"\d+(?:[.,]\d+)*", answer):
+        if num not in haystack:
+            issues.append(f"number {num} not found in tool outputs")
+    for action in claimed_actions:
+        if action not in action_log:
+            issues.append(f"claimed action '{action}' not in action log")
+    return issues
+
+
+outputs = ["Booking BK-9 cancelled; refund 412.50 GBP issued", "New flight LH903 departs 14:05"]
+log = ["cancel_booking", "issue_refund", "rebook"]
+assert verify_answer("Refunded 412.50 GBP; you're on LH903 at 14:05.", outputs, log, ["issue_refund", "rebook"]) == []
+bad = verify_answer("Refunded 450.00 GBP and emailed your manager.", outputs, log, ["issue_refund", "send_email"])
+assert bad == ["number 450.00 not found in tool outputs", "claimed action 'send_email' not in action log"]
+```
+
+Claiming actions that never happened is a real and dangerous agent failure. Deterministic checks like these are cheap to run on every answer. On failure, regenerate with the issues listed, or return a conservative answer built from the action log itself.
+F:
+- How would you handle derived numbers (sums, conversions) that legitimately aren't in any tool output?
+
+@@ Weighted voting across agents | Medium | Multi-agent
+Q: Several independent agents classify a transaction (for example fraud or legitimate). Implement weighted voting, with each agent's weight set by its measured reliability, abstentions allowed, and escalation when the margin is too small.
+A:
+```python
+from collections import defaultdict
+
+
+def weighted_vote(votes: dict[str, str | None], weights: dict[str, float], min_margin: float = 0.25) -> dict:
+    tally: dict[str, float] = defaultdict(float)
+    for agent, label in votes.items():
+        if label is not None:
+            tally[label] += weights[agent]
+    if not tally:
+        return {"decision": "escalate", "reason": "all abstained"}
+    ranked = sorted(tally.items(), key=lambda kv: -kv[1])
+    total = sum(tally.values())
+    top, second = ranked[0][1], ranked[1][1] if len(ranked) > 1 else 0.0
+    if (top - second) / total < min_margin:
+        return {"decision": "escalate", "reason": "no clear majority", "tally": dict(tally)}
+    return {"decision": ranked[0][0], "confidence": round(top / total, 3)}
+
+
+weights = {"rules_agent": 0.6, "pattern_agent": 0.9, "llm_agent": 0.7}
+assert weighted_vote({"rules_agent": "fraud", "pattern_agent": "fraud", "llm_agent": "legit"}, weights) == {
+    "decision": "fraud", "confidence": 0.682}
+assert weighted_vote({"rules_agent": "fraud", "pattern_agent": "legit", "llm_agent": None}, weights)["decision"] == "escalate"
+assert weighted_vote({"rules_agent": None, "pattern_agent": None, "llm_agent": None}, weights)["reason"] == "all abstained"
+```
+
+Voting helps only when the voters make somewhat independent errors: different models, data or methods. Three copies of the same prompt mostly agree on the same mistakes. Calibrate the weights on labelled outcomes, and never let a vote replace required human review for regulated decisions.
+F:
+- How would you measure whether your voters' errors are correlated?
+
+@@ Blackboard architecture | Medium | Multi-agent
+Q: Implement a blackboard system: specialist agents watch a shared fact store, each runs when its preconditions are met and adds new facts, and a controller loops until the goal fact appears or no agent can make progress.
+A:
+```python
+from typing import Callable
+
+Agent = tuple[str, Callable[[dict], bool], Callable[[dict], dict]]
+
+
+def blackboard(facts: dict, agents: list[Agent], goal: str, max_cycles: int = 10) -> dict:
+    ran = []
+    for _ in range(max_cycles):
+        if goal in facts:
+            return {"facts": facts, "ran": ran, "status": "goal"}
+        progressed = False
+        for name, ready, act in agents:
+            if ready(facts):
+                new = {k: v for k, v in act(facts).items() if k not in facts}
+                if new:
+                    facts.update(new)
+                    ran.append(name)
+                    progressed = True
+        if not progressed:
+            return {"facts": facts, "ran": ran, "status": "stuck"}
+    return {"facts": facts, "ran": ran, "status": "max_cycles"}
+
+
+agents: list[Agent] = [
+    ("trade_fetcher", lambda f: "break_id" in f, lambda f: {"trade": {"qty": 1000, "px": 101.20}}),
+    ("confirm_fetcher", lambda f: "break_id" in f, lambda f: {"confirm": {"qty": 1000, "px": 101.25}}),
+    ("diff_agent", lambda f: "trade" in f and "confirm" in f,
+     lambda f: {"diff": {"field": "px", "delta": round(f["confirm"]["px"] - f["trade"]["px"], 4)}}),
+    ("resolver", lambda f: "diff" in f, lambda f: {"resolution": f"price mismatch of {f['diff']['delta']}; request amended confirm"}),
+]
+out = blackboard({"break_id": "BRK-9"}, agents, goal="resolution")
+assert out["status"] == "goal" and out["facts"]["resolution"].startswith("price mismatch of 0.05")
+assert out["ran"] == ["trade_fetcher", "confirm_fetcher", "diff_agent", "resolver"]
+assert blackboard({}, agents, "resolution")["status"] == "stuck"
+```
+
+Blackboards suit problems where the order of work isn't known in advance and specialists contribute opportunistically, such as investigations and diagnostics. The shared state is also a natural audit record. A LangGraph state object shared by nodes is a structured blackboard.
+F:
+- What problems arise when two agents write conflicting facts?
+
+@@ Agent communication options | Medium | Protocols
+Q: Compare the ways agents and tools communicate: in-process function or tool calls, in-framework handoffs, MCP, A2A and message queues. When would you use each?
+A:
+- In-process tool calls: the agent calls Python functions directly. It is fastest and simplest, suited to tools owned by the same team and deployed together.
+- In-framework handoffs and sub-graphs (for example LangGraph): multiple agents in one runtime with shared state and checkpointing. Good for tightly coupled workflows owned by one team.
+- MCP (Model Context Protocol): a standard way for an agent host to discover and call tools, resources and prompts exposed by separate servers. Use it to share tools across many agents and teams, with auth, discovery and versioning. The 2026-07-28 revision makes it stateless, per-request.
+- A2A (Agent2Agent): a standard for one agent to delegate a task to another, independently built agent (Agent Cards for discovery, tasks with lifecycle states, streaming and push notifications). Use it across team or vendor boundaries where the other side is an agent, not a tool.
+- Message queues and events (Kafka, SQS, Service Bus): asynchronous, decoupled, durable triggers and results. Good for long-running and background work, and for integrating with existing enterprise systems.
+
+A platform typically uses all of them: MCP for the tool ecosystem, A2A for cross-team agents, queues for durability, and in-process calls inside each agent.
+F:
+- When would you expose an agent via A2A rather than as an MCP tool?
+
+@@ Choosing an agent framework | Medium | Frameworks
+Q: How would you evaluate agent frameworks (LangGraph, LangChain agents, OpenAI Agents SDK, Semantic Kernel, AutoGen-style libraries, cloud-managed agents such as Bedrock AgentCore) for an enterprise platform?
+A:
+Criteria:
+- Control and transparency: explicit graphs and state (auditable, testable) versus opaque loops.
+- Durability: checkpointing, resume, human-in-the-loop interrupts and long-running support.
+- Model agnosticism: works across Azure OpenAI, Bedrock and self-hosted models through the platform gateway.
+- Tooling standards: MCP client support, A2A support, and structured outputs.
+- Streaming and UX: token, event and state streaming to front ends.
+- Observability: tracing (OpenTelemetry or LangSmith), and hooks for guardrails and evaluation.
+- Deployment and operations: runs in your own infrastructure (containers, Kubernetes), scaling, versioning of in-flight runs, and security review of the dependencies.
+- Maturity: API stability (for example LangChain and LangGraph at 1.x), community, vendor support, and licence.
+- Team fit: Python and TypeScript support, learning curve.
+
+A common enterprise answer: LangGraph for orchestration (explicit and durable), MCP for tools, A2A for inter-agent calls, a platform LLM gateway, and managed runtimes where they meet the controls. Prototype the hardest workflow in two options before standardising.
+F:
+- What's the risk of adopting a fast-moving framework in a bank, and how do you mitigate it?
+
+@@ Stateless versus stateful agent services | Medium | Architecture
+Q: Should an agent service keep conversation and run state in memory, or be stateless with external state? Discuss the trade-offs.
+A:
+- In-memory stateful services are simple and fast, but state is lost on crash or deploy, you need sticky routing, they're hard to scale horizontally, and long waits (approvals) tie up processes.
+- Stateless services with external state (a checkpointer in Postgres, Redis or Cosmos DB, keyed by thread or run id): any replica can serve any request, they survive restarts and deployments, autoscale freely, and support long pauses. The costs are latency and cost of state reads and writes, serialisation, and schema versioning.
+
+Practical design: stateless API and worker pods, durable checkpoints after each step, caches for hot state, and streaming connections routed to whichever pod is running the step (clients reconnect with a thread id). This mirrors the direction of MCP's 2026-07-28 revision, which removed protocol-level sessions in favour of explicit state handles.
+F:
+- How do you resume a streamed response after the pod serving it dies?
+
+@@ Stream agent progress events | Medium | UX engineering
+Q: Implement an agent runner that yields typed progress events (status, tool start and end, token deltas, final answer), so the UI can show what the agent is doing instead of a spinner.
+A:
+```python
+from typing import Iterator
+
+
+def run_agent_stream(question: str, plan: list[tuple[str, str]], answer_tokens: list[str]) -> Iterator[dict]:
+    yield {"type": "status", "text": "Planning"}
+    results = []
+    for tool, arg in plan:
+        yield {"type": "tool_start", "tool": tool, "summary": f"{tool}({arg})"}
+        results.append(f"{tool}:{arg}:ok")
+        yield {"type": "tool_end", "tool": tool, "ok": True}
+    yield {"type": "status", "text": "Writing answer"}
+    for tok in answer_tokens:
+        yield {"type": "token", "text": tok}
+    yield {"type": "final", "answer": "".join(answer_tokens), "tool_results": len(results)}
+
+
+events = list(run_agent_stream("rebook", [("search_flights", "FRA"), ("hold_seat", "LH903")],
+                               ["You're ", "on ", "LH903."]))
+kinds = [e["type"] for e in events]
+assert kinds == ["status", "tool_start", "tool_end", "tool_start", "tool_end", "status", "token", "token", "token", "final"]
+assert events[-1]["answer"] == "You're on LH903."
+```
+
+Send these over SSE or WebSocket with an event name per type. Don't stream raw tool arguments or outputs that may contain sensitive data, only user-safe summaries. End with a terminal event, so clients can tell completion from a dropped connection. LangGraph's streaming modes (`updates`, `messages`, `custom`) map directly onto this.
+F:
+- Which events would you hide from end users but keep in traces?
+
+@@ Pause and resume an agent with generators | Medium | Human-in-the-loop
+Q: Model an agent as a generator that yields when it needs human input (approval) and resumes with the human's decision via `send()`. Write the driver that feeds decisions.
+A:
+```python
+from typing import Generator
+
+
+def refund_agent(invoice: str, amount: float) -> Generator[dict, dict, dict]:
+    facts = {"invoice": invoice, "amount": amount}
+    if amount > 100:
+        decision = yield {"type": "approval_request", "action": "issue_refund", "args": facts}
+        if not decision.get("approved"):
+            return {"status": "rejected", "reason": decision.get("reason", "")}
+    return {"status": "refunded", **facts}
+
+
+def drive(gen: Generator, decide) -> dict:
+    try:
+        request = next(gen)
+        while True:
+            request = gen.send(decide(request))
+    except StopIteration as done:
+        return done.value
+
+
+assert drive(refund_agent("INV-1", 50.0), decide=lambda r: {}) == {"status": "refunded", "invoice": "INV-1", "amount": 50.0}
+assert drive(refund_agent("INV-2", 500.0), decide=lambda r: {"approved": True})["status"] == "refunded"
+assert drive(refund_agent("INV-3", 500.0), decide=lambda r: {"approved": False, "reason": "duplicate"}) == {
+    "status": "rejected", "reason": "duplicate"}
+```
+
+Generators make the pause point explicit, but they live in process memory, so a restart loses them. Durable frameworks persist the state at the pause (LangGraph's `interrupt()` saves a checkpoint, and `Command(resume=...)` continues possibly days later on another pod). The shape of the code is the same.
+F:
+- What must be persisted so the pause survives a deployment?
+
+@@ Observability requirements for agents | Medium | Observability
+Q: What must you capture to operate and debug agents in production, beyond normal service telemetry?
+A:
+- The full trajectory per run: every model call (prompt version, model, parameters, tokens, latency, output), every tool call (name, validated arguments or a redacted summary, result status, latency), decisions (routing, re-planning, handoffs) and state snapshots or checkpoints.
+- Control events: guard trips (loops, budgets), approvals requested and resolved (by whom), escalations, and policy blocks.
+- Outcomes: the final status and stop reason, task success (from verifiers, users or downstream systems), and user feedback.
+- Aggregates: steps per run, tool error rates, retry and fallback rates, cost per run and per successful task, and latency per step and end to end.
+- Correlation: trace ids propagated across sub-agents, MCP servers and A2A calls, and business ids (the booking or break id) on spans, so support can find the run.
+- Replay: enough to re-run a trajectory against fakes for debugging.
+- Privacy: redaction, access controls and retention for prompt and tool content.
+F:
+- Which three agent metrics would you put on the on-call dashboard?
+
+@@ Cost of multi-agent systems | Medium | Cost control
+Q: A multi-agent prototype costs 15 times more per task than a single-agent version. Where does the cost come from, and how do you reduce it?
+A:
+Sources:
+- More LLM calls: supervisor hops, planning, critique rounds, and each worker's own reasoning loop.
+- Context duplication: every agent receives the system prompt, tool schemas and often the shared history, so tokens multiply with agents and turns.
+- Verbose inter-agent messages: agents "chatting" in prose, with full transcripts passed around.
+- Retries and loops multiplied across agents, and reasoning models used everywhere.
+
+Reductions:
+- Collapse agents where evaluation shows no benefit. Use tools or simple functions instead of agents for deterministic steps.
+- Structured, compact handoffs (summaries plus ids, not transcripts), and sub-agents that return only results.
+- Model tiering: small models for routing and extraction, large ones only for hard reasoning.
+- Prompt caching of the shared stable prefixes, and trimming tool schemas per agent.
+- Budgets per run and per agent, and caps on critique and re-planning rounds.
+- Measure cost per successful task: sometimes the extra cost buys real success-rate gains, and sometimes it doesn't.
+F:
+- How would you decide whether a critic agent is paying for itself?
+
+@@ When multi-agent is overkill | Medium | Agent design
+Q: A team wants six cooperating agents for a policy Q&A assistant. How do you push back constructively?
+A:
+Ask what each agent adds that a single, well-scoped agent or workflow doesn't:
+- Policy Q&A is retrieval, then grounded answer, then citation check. That is a fixed pipeline with maybe one agentic retrieval step. Six agents add latency (sequential hops), cost (duplicated context), failure points (handoff errors, loops) and a harder evaluation (nested trajectories), with little benefit.
+
+Multi-agent designs pay off when there are:
+- Genuinely distinct skill and tool sets with separate permissions (payments versus communications).
+- Parallelisable independent sub-tasks (analyse 30 contracts).
+- Separate ownership (different teams own different agents, possibly across A2A boundaries).
+- Context isolation needs (long, noisy sub-tasks).
+
+Constructive path: build the simplest baseline, build the evaluation set, and add an agent only when the evaluation shows a measurable gain that justifies its cost and complexity.
+F:
+- What metric would you use to justify adding the second agent?
+
+@@ Orchestrating a personal AI assistant | Medium | Personal assistants
+Q: Design the orchestration for a personal AI assistant that handles email, calendar, documents and internal apps for an employee.
+A:
+- Entry: a chat or voice UI, plus background triggers (new email, a calendar change, schedules).
+- Orchestrator: an intent router, then a small set of skills or sub-agents (inbox triage, scheduling, document Q&A, expenses, travel), each with a scoped tool set. Tools are exposed through MCP servers behind a governed gateway (Graph or email, calendar, document management, HR and finance systems).
+- Identity: acts on behalf of the user (delegated OAuth tokens with narrow scopes), and entitlement checks happen in every downstream system.
+- Memory: per-user preferences and facts (inspectable and deletable), episodic lessons, and a per-task scratchpad.
+- Autonomy tiers: read and summarise automatically; draft and propose need user confirmation; send, book or pay need explicit approval; some actions are never allowed.
+- Safety: untrusted content (emails, documents) is treated as data (injection defences, no tool authority from content), outputs are filtered, and every action is audited.
+- Proactivity: notifications with explanations and undo, quiet hours, and rate limits.
+- Operations: per-user budgets, tracing, evaluation of each skill, and a kill switch.
+F:
+- How would you stop a malicious email from making the assistant forward confidential files?
+
+@@ Design a flight-disruption rebooking agent | Hard | Agent design
+Q: Design an agent that, when a traveller's flight is cancelled, rebooks the flight and updates the hotel and dinner reservations, within minutes and safely.
+A:
+Trigger: an airline disruption event arrives on a queue, and the agent identifies the affected trips (booking lookup).
+
+Flow (a graph with agentic nodes):
+1. Assess: get the trip itinerary, traveller preferences and policy (cabin, budget, loyalty), and the constraints (must arrive before the meeting).
+2. Search and rank alternatives (flights, alternate airports or rail) with deterministic constraint filtering and scoring. The LLM is used for explanation and edge-case judgement, not for arithmetic.
+3. Propose to the traveller: the top options with trade-offs, via their channel, with one-tap approval. Auto-book only within pre-authorised rules (same cabin, below the price delta, arrives before the deadline).
+4. Execute as a saga: hold the seat, then ticket, then update the hotel (shift the dates or cancel and rebook), then move the dinner. Each step is idempotent, with compensations (release the hold, restore the hotel) on failure.
+5. Notify with the new itinerary, and update the expense and policy records.
+
+Engineering: durable state per disruption (checkpointed), deadlines (seat availability disappears fast), parallel searches, circuit breakers on supplier APIs, human escalation when the fare rules block changes or it is repeatedly failing, and full audit.
+
+Metrics: time to recovery (for example from 45 minutes to 90 seconds), rebooking success rate, traveller acceptance rate, cost delta against policy, and escalations.
+F:
+- Which steps must never be automated without the traveller's explicit approval?
+
+@@ Rank rebooking options under constraints | Medium | Agent tools
+Q: Implement the deterministic ranking tool the rebooking agent calls: filter flights by hard constraints (arrive before the deadline, cabin at least the original, price increase within budget), score the rest, and return the reasons for rejected options.
+A:
+```python
+from datetime import datetime
+
+CABIN_RANK = {"economy": 0, "premium": 1, "business": 2}
+
+
+def rank_options(options: list[dict], deadline: datetime, min_cabin: str, max_extra: float,
+                 w_arrival: float = 1.0, w_stops: float = 2.0, w_cost: float = 0.01) -> tuple[list[dict], dict]:
+    feasible, rejected = [], {}
+    for o in options:
+        reasons = []
+        if o["arrive"] > deadline:
+            reasons.append("arrives after deadline")
+        if CABIN_RANK[o["cabin"]] < CABIN_RANK[min_cabin]:
+            reasons.append("cabin downgrade")
+        if o["extra_cost"] > max_extra:
+            reasons.append("over budget")
+        if reasons:
+            rejected[o["id"]] = reasons
+            continue
+        slack_h = (deadline - o["arrive"]).total_seconds() / 3600
+        score = w_arrival * min(slack_h, 6) - w_stops * o["stops"] - w_cost * o["extra_cost"]
+        feasible.append({**o, "score": round(score, 3)})
+    return sorted(feasible, key=lambda o: (-o["score"], o["id"])), rejected
+
+
+d = datetime(2026, 10, 1, 18, 0)
+opts = [
+    {"id": "LH903", "arrive": datetime(2026, 10, 1, 14, 5), "cabin": "economy", "stops": 0, "extra_cost": 0},
+    {"id": "BA912", "arrive": datetime(2026, 10, 1, 12, 30), "cabin": "economy", "stops": 1, "extra_cost": 120},
+    {"id": "LX345", "arrive": datetime(2026, 10, 1, 19, 10), "cabin": "business", "stops": 0, "extra_cost": 0},
+    {"id": "EW777", "arrive": datetime(2026, 10, 1, 9, 0), "cabin": "economy", "stops": 0, "extra_cost": 900},
+]
+ranked, rejected = rank_options(opts, d, "economy", max_extra=300)
+assert [o["id"] for o in ranked] == ["LH903", "BA912"]
+assert rejected == {"LX345": ["arrives after deadline"], "EW777": ["over budget"]}
+```
+
+Put hard constraints and scoring in code (deterministic, testable, explainable to the traveller). The LLM's role is to interpret soft preferences ("I'd rather not change at Heathrow") into parameters, and to explain the choice. The rejection reasons also make good user-facing explanations.
+F:
+- How would you incorporate soft preferences without letting the model override hard rules?
+
+@@ Trade-break remediation agent | Hard | Agent design
+Q: Operations analysts spend hours clearing trade breaks (mismatches between internal trade records and counterparty confirmations). Design an agent that remediates them safely.
+A:
+- Intake: breaks arrive from the reconciliation system via a queue, with trade, confirm and position data references.
+- Investigate (read-only tools): fetch the trade, confirmation, settlement instructions, reference data (SSIs, instrument data), FX rates, and prior similar breaks. The agent compares the fields and classifies the break (price or quantity mismatch, wrong settlement date, missing SSI, duplicate booking, timing difference).
+- Decide with playbooks: each break class maps to a deterministic playbook with tolerances (auto-resolve timing differences within T+1; propose a price amendment within tolerance; escalate SSI changes, which are fraud-sensitive). The LLM classifies ambiguous cases, gathers evidence, and drafts communications. It doesn't invent fixes outside the playbooks.
+- Act with approval: proposed amendments go to an analyst queue with the evidence and a one-click approve (four-eyes for monetary impact above a threshold). Low-risk actions (tagging, requesting an amended confirm) can be automatic.
+- Audit: every step logged with evidence, approver and before and after values. Regulatory records are retained.
+- Metrics: the percentage of the daily queue cleared on analyst approval (for example 55%), time to resolve, the error or reversal rate, and analyst overrides.
+F:
+- Why must settlement-instruction changes always go to a human?
+
+@@ Route exceptions to remediation playbooks | Medium | Agent tools
+Q: Implement the playbook router for trade breaks: classify by comparing the trade and confirmation fields, apply tolerances, and return the playbook, whether it can auto-execute, and whether approval is required.
+A:
+```python
+from datetime import date
+from decimal import Decimal
+
+
+def route_break(trade: dict, confirm: dict, px_tol: Decimal = Decimal("0.01"),
+                auto_limit: Decimal = Decimal("1000")) -> dict:
+    if trade["ssi"] != confirm["ssi"]:
+        return {"playbook": "ssi_mismatch", "auto": False, "approval": "operations_and_fraud"}
+    if trade["qty"] != confirm["qty"]:
+        return {"playbook": "request_amended_confirm", "auto": True, "approval": None}
+    px_diff = abs(Decimal(trade["px"]) - Decimal(confirm["px"]))
+    if px_diff:
+        impact = px_diff * trade["qty"]
+        if px_diff <= px_tol and impact <= auto_limit:
+            return {"playbook": "price_amend", "auto": False, "approval": "analyst", "impact": impact}
+        return {"playbook": "price_dispute", "auto": False, "approval": "senior_analyst", "impact": impact}
+    if trade["settle"] != confirm["settle"] and abs((trade["settle"] - confirm["settle"]).days) <= 1:
+        return {"playbook": "timing_difference", "auto": True, "approval": None}
+    return {"playbook": "investigate_manually", "auto": False, "approval": "analyst"}
+
+
+base = {"qty": 1000, "px": "101.20", "ssi": "SSI-GB-1", "settle": date(2026, 10, 2)}
+assert route_break(base, {**base, "px": "101.21"})["playbook"] == "price_amend"
+assert route_break(base, {**base, "px": "102.50"})["approval"] == "senior_analyst"
+assert route_break(base, {**base, "ssi": "SSI-XX-9"}) == {"playbook": "ssi_mismatch", "auto": False,
+                                                           "approval": "operations_and_fraud"}
+assert route_break(base, {**base, "settle": date(2026, 10, 3)})["playbook"] == "timing_difference"
+assert route_break(base, {**base, "qty": 900})["auto"] is True
+```
+
+The rules are checked in order of risk: SSI changes first, because they are the classic payment-fraud vector. Playbooks in code give consistent, auditable decisions. The agent adds value by gathering evidence, handling unstructured confirmations (PDF or email parsing), and drafting counterparty messages.
+F:
+- How would you add a new break type without redeploying the agent?
+
+@@ Agentic code-fix loop design | Medium | Agent design
+Q: Design an agent that automatically proposes fixes for red CI builds using MCP servers for repository, CI and issue-tracker access.
+A:
+1. Trigger: a CI failure webhook arrives on a queue. Deduplicate by commit and job.
+2. Gather context through MCP tools: failing job logs (truncated to the relevant errors), the diff of the triggering commit, the relevant source files (search and read tools), test files, and recent similar failures.
+3. Diagnose: classify the failure (a test regression, a flaky test, a dependency or infrastructure issue, a lint or type error). Skip or route infrastructure and flaky issues, since not every red build is a code bug.
+4. Fix loop: in a sandbox checkout, the agent proposes a patch, runs the targeted tests, reads the failures, and revises, with an iteration cap and a no-progress detector.
+5. Output: open a pull request with the patch, an explanation, and the test evidence. It never pushes to protected branches. A human reviews and merges.
+6. Safety: sandboxed execution (no secrets, restricted network), repository permissions scoped to branch creation, dependency and secret scanning on the patch, and no changes to CI configuration or security-sensitive files without escalation.
+
+Metrics: the fraction of red builds with an accepted fix (for example 62% self-patched), MTTR (for example from 4 hours to 11 minutes), the reviewer acceptance rate, reverts, and cost per fix.
+F:
+- Which file types or directories would you forbid the agent from modifying?
+
+@@ Code-fix loop with test feedback | Medium | Agent loops
+Q: Implement a bounded fix loop: run the tests, give the failures to a patch proposer, apply its patch, and repeat until the tests pass, the iteration cap is hit, or the same failures repeat (no progress).
+A:
+```python
+from typing import Callable
+
+
+def fix_loop(code: dict[str, str], run_tests: Callable[[dict], set[str]],
+             propose: Callable[[dict, set[str]], dict[str, str]], max_iters: int = 4) -> dict:
+    seen: list[frozenset[str]] = []
+    for i in range(max_iters + 1):
+        failures = run_tests(code)
+        if not failures:
+            return {"status": "fixed", "iterations": i, "code": code}
+        if frozenset(failures) in seen:
+            return {"status": "no_progress", "iterations": i, "failures": sorted(failures)}
+        seen.append(frozenset(failures))
+        if i == max_iters:
+            break
+        code = {**code, **propose(code, failures)}
+    return {"status": "gave_up", "iterations": max_iters, "failures": sorted(failures)}
+
+
+def run_tests(code: dict[str, str]) -> set[str]:
+    env: dict = {}
+    exec(code["fees.py"], env)
+    failures = set()
+    if env["fee"](100) != 1.0:
+        failures.add("test_fee_basic")
+    if env["fee"](0) != 0:
+        failures.add("test_fee_zero")
+    return failures
+
+
+def propose(code: dict[str, str], failures: set[str]) -> dict[str, str]:
+    if "test_fee_basic" in failures:
+        return {"fees.py": "def fee(x):\n    return x * 0.01 if x else 1"}
+    return {"fees.py": "def fee(x):\n    return x * 0.01"}
+
+
+out = fix_loop({"fees.py": "def fee(x):\n    return x * 0.1"}, run_tests, propose)
+assert out["status"] == "fixed" and out["iterations"] == 2
+stuck = fix_loop({"fees.py": "def fee(x):\n    return 7"}, run_tests, lambda c, f: {"fees.py": "def fee(x):\n    return 7"})
+assert stuck["status"] == "no_progress"
+```
+
+The first patch fixed one test and broke nothing, and the second fixed the rest. `exec` stands in here for running tests in a sandboxed container, which is what production must do. The no-progress check saves money when the agent keeps making the same mistake.
+F:
+- How would you stop the agent from "fixing" tests by weakening the assertions?
+
+@@ Fraud investigation agent design | Hard | Agent design
+Q: Design an agent that helps fraud analysts investigate flagged transactions using payment data, device signals and account history.
+A:
+- Trigger: an alert from the fraud-detection system (rules or ML score) for a transaction or account.
+- Evidence gathering (read-only tools): the transaction details, account history and baselines (typical amounts, merchants, geographies), device and IP signals, linked accounts (shared devices or payees), prior alerts and outcomes, and external data (merchant risk lists).
+- Analysis: deterministic features and scores from code (velocity, amount z-score, new payee, geo mismatch). The LLM synthesises a narrative: the timeline, which signals fired and why they matter, similar past cases, and gaps in the evidence.
+- Output: an explainable risk summary with a score breakdown, recommended actions from a fixed menu (monitor, contact the customer, block the card, file a report), and citations to the evidence. It never takes customer-impacting actions automatically unless a policy explicitly allows it (for example a temporary hold in a clear account-takeover pattern), with immediate analyst review.
+- Controls: data minimisation, access logging, analyst decision capture (for model improvement and audit), fairness monitoring (don't use protected attributes, check outcomes across groups), and regulatory reporting requirements handled by humans.
+
+Metrics: analyst time per case, decision accuracy against outcomes, false-positive burden, and consistency across analysts.
+F:
+- Which parts of the risk score must never be LLM-generated?
+
+@@ Explainable risk score aggregation | Medium | Agent tools
+Q: Implement a deterministic, explainable risk score: weighted signals produce a 0–100 score, and the tool returns the top contributing reasons so the agent (and the analyst) can explain the result.
+A:
+```python
+def risk_score(signals: dict[str, float], weights: dict[str, float], cap: float = 100.0) -> dict:
+    contributions = {name: weights[name] * value for name, value in signals.items() if name in weights}
+    raw = sum(contributions.values())
+    score = max(0.0, min(cap, raw))
+    reasons = sorted(((c, n) for n, c in contributions.items() if c > 0), reverse=True)[:3]
+    return {"score": round(score, 1), "reasons": [f"{n} (+{c:.1f})" for c, n in reasons],
+            "band": "high" if score >= 70 else "medium" if score >= 40 else "low"}
+
+
+weights = {"new_payee": 25, "amount_zscore": 8, "geo_mismatch": 20, "device_change": 15, "long_tenure": -10}
+signals = {"new_payee": 1, "amount_zscore": 4.5, "geo_mismatch": 1, "device_change": 0, "long_tenure": 1}
+r = risk_score(signals, weights)
+assert r == {"score": 71.0, "reasons": ["amount_zscore (+36.0)", "new_payee (+25.0)", "geo_mismatch (+20.0)"],
+             "band": "high"}
+assert risk_score({"long_tenure": 1}, weights)["score"] == 0.0
+```
+
+Deterministic scoring is reproducible, testable and auditable, and it gives the LLM facts to narrate rather than numbers to invent. In a real bank, the scoring model itself falls under model risk management (validation, monitoring, fairness review), whether it is rules or ML.
+F:
+- How would you explain a score to a customer who disputes a blocked payment?
+
+@@ Guardrails on agent actions | Medium | Agent safety
+Q: Beyond content filters, what guardrails should wrap an agent's actions?
+A:
+- Before the call: tool allowlists per task, argument validation (schema plus business rules), authorisation against the user's entitlements, rate limits and budgets, risk-tier policy (auto, approve or forbid), and checks that inputs come from trusted sources (not injected instructions).
+- During the call: timeouts, circuit breakers, idempotency keys, a sandbox for code and browsing, and network egress restrictions.
+- After the call: verification that the effect matches the intent (re-read the state), anomaly detection on action patterns (for example 50 emails in a minute), and output filtering of tool results before they reach users.
+- Across the run: step and cost caps, loop detection, audit logging, a human-escalation path, and a kill switch per agent or tenant.
+
+The principle: the model proposes, deterministic code disposes. Guardrails live in the tool dispatcher and platform, not in the prompt, so they hold even when the model is confused or manipulated.
+F:
+- Which guardrail would have stopped the most incidents in agent systems you know of?
+
+@@ Policy engine for tool calls | Medium | Agent safety
+Q: Implement a small policy engine for agent tool calls: ordered rules with conditions on the tool, the user's role and the arguments, first match wins, default deny, and the matched rule id returned for audit.
+A:
+```python
+from decimal import Decimal
+from typing import Callable
+
+Rule = tuple[str, str, Callable[[dict], bool]]
+
+RULES: list[Rule] = [
+    ("R1-deny-external-email-for-contractors", "deny",
+     lambda c: c["tool"] == "send_email" and c["role"] == "contractor" and not c["args"]["to"].endswith("@corp.example")),
+    ("R2-approve-large-refunds", "approve",
+     lambda c: c["tool"] == "issue_refund" and Decimal(c["args"]["amount"]) > Decimal("200")),
+    ("R3-allow-refunds", "allow", lambda c: c["tool"] == "issue_refund" and c["role"] in {"support", "ops"}),
+    ("R4-allow-reads", "allow", lambda c: c["tool"].startswith(("get_", "search_", "list_"))),
+]
+
+
+def evaluate(call: dict, rules: list[Rule] = RULES) -> tuple[str, str]:
+    for rule_id, effect, cond in rules:
+        try:
+            if cond(call):
+                return effect, rule_id
+        except (KeyError, ValueError, ArithmeticError):
+            return "deny", f"{rule_id}:malformed-arguments"
+    return "deny", "default-deny"
+
+
+assert evaluate({"tool": "get_balance", "role": "support", "args": {}}) == ("allow", "R4-allow-reads")
+assert evaluate({"tool": "issue_refund", "role": "support", "args": {"amount": "50"}}) == ("allow", "R3-allow-refunds")
+assert evaluate({"tool": "issue_refund", "role": "support", "args": {"amount": "900"}})[0] == "approve"
+assert evaluate({"tool": "send_email", "role": "contractor", "args": {"to": "x@gmail.com"}})[0] == "deny"
+assert evaluate({"tool": "delete_account", "role": "ops", "args": {}}) == ("deny", "default-deny")
+assert evaluate({"tool": "issue_refund", "role": "ops", "args": {}})[0] == "deny"
+```
+
+Errors in a condition deny rather than allow. Rule ids in the audit log make every decision explainable. At platform scale, use a policy language and engine (OPA/Rego, Cedar) with policy tests, so risk and security teams can review the policies without reading application code.
+F:
+- Why is rule order significant here, and how would you test it?
+
+@@ Per-user rate limits on agent tools | Medium | Agent safety
+Q: Limit how often an agent can call a sensitive tool on behalf of each user (for example at most 5 emails per 10 minutes), using a sliding window with an injectable clock.
+A:
+```python
+from collections import defaultdict, deque
+
+
+class SlidingWindowLimiter:
+    def __init__(self, limit: int, window_s: float, clock) -> None:
+        self.limit, self.window, self.clock = limit, window_s, clock
+        self.events: dict[tuple[str, str], deque[float]] = defaultdict(deque)
+
+    def allow(self, user: str, tool: str) -> bool:
+        now = self.clock()
+        q = self.events[(user, tool)]
+        while q and q[0] <= now - self.window:
+            q.popleft()
+        if len(q) >= self.limit:
+            return False
+        q.append(now)
+        return True
+
+
+t = [0.0]
+lim = SlidingWindowLimiter(limit=5, window_s=600, clock=lambda: t[0])
+results = []
+for i in range(7):
+    t[0] = i * 10
+    results.append(lim.allow("u-priya", "send_email"))
+assert results == [True] * 5 + [False, False]
+assert lim.allow("u-tom", "send_email")
+t[0] = 601
+assert lim.allow("u-priya", "send_email")
+```
+
+Rate limits contain the blast radius of a compromised or looping agent (a prompt-injected assistant can't mass-mail the address book). Make limit hits visible: tell the agent it is rate-limited, alert on unusual patterns, and use a shared store (Redis) across replicas.
+F:
+- Should limits be per agent, per user, or both?
+
+@@ Detect goal drift during a run | Medium | Agent safety
+Q: Implement a drift detector: compare each step's stated purpose with the original goal, and flag the run when several consecutive steps have low relevance to the goal.
+A:
+```python
+import re
+
+STOP = {"the", "a", "to", "for", "of", "and", "on", "in", "my", "check", "get"}
+
+
+def terms(s: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z]+", s.lower()) if w not in STOP}
+
+
+def drift_check(goal: str, step_purposes: list[str], min_overlap: int = 1, patience: int = 2) -> int | None:
+    g = terms(goal)
+    streak = 0
+    for i, purpose in enumerate(step_purposes):
+        streak = streak + 1 if len(g & terms(purpose)) < min_overlap else 0
+        if streak >= patience:
+            return i
+    return None
+
+
+goal = "Rebook the cancelled Frankfurt flight and update the hotel"
+ok_steps = ["search Frankfurt flights", "hold seat on flight LH903", "update hotel dates"]
+drifting = ["search Frankfurt flights", "read CEO inbox", "export contacts list", "update hotel dates"]
+assert drift_check(goal, ok_steps) is None
+assert drift_check(goal, drifting) == 2
+```
+
+Drift is a signal of confusion or of prompt injection ("read CEO inbox" is not part of rebooking). When it fires, pause and re-ground the agent on the goal, require approval for the next action, or stop and escalate. Use embeddings instead of word overlap in production, and combine this with the tool allowlist, which blocks the dangerous actions regardless.
+F:
+- Why is drift detection a complement to, not a replacement for, tool allowlists?
+
+@@ Judging the quality of a task decomposition | Medium | Planning
+Q: How do you tell whether an agent's plan or decomposition is good before executing it?
+A:
+Checks:
+- Coverage: every requirement in the goal maps to at least one step (for example the hotel update isn't forgotten).
+- Feasibility: every step uses an available tool, with obtainable inputs. Dependencies are acyclic, and no step depends on information that only a later step produces.
+- Minimality: no redundant or irrelevant steps (a drift signal).
+- Safety: side-effecting steps come after verification steps, the irreversible ones are last, and approvals are placed before commits.
+- Granularity: steps that are small enough to verify, but not so tiny that every call becomes a plan step.
+- Efficiency: independent steps marked parallelisable, and expensive steps justified.
+
+Methods: deterministic validation (schema, tools exist, DAG check), rubric-based judging of coverage and ordering, and comparison with reference plans for common tasks. Show plans to users for approval on high-stakes tasks.
+F:
+- How would you automatically check that a plan covers all parts of the request?
+
+@@ Tool selection at scale | Medium | Tooling
+Q: The platform has 400 tools from many MCP servers. How do you keep agents choosing the right tools?
+A:
+- Don't load everything: select a candidate set per request (by assistant configuration, user role and embedding search over the tool descriptions), typically 5–30 tools.
+- Namespace and curate: server or domain prefixes (`hr.search_policies`), no near-duplicates, and deprecate overlapping tools.
+- Description quality: when to use it and when not to, with examples, reviewed like prompts and tested with tool-selection evaluations.
+- Hierarchy: a "find tools" meta-tool or skill packs, loaded on demand when the agent realises it needs a capability.
+- Routing: specialist agents with small tool sets rather than one agent with everything.
+- Stable ordering and schemas help prompt caching (the MCP 2026-07-28 guidance recommends deterministic tool list order).
+- Measure it: tool-selection accuracy per tool, confusion pairs, "no suitable tool" rates, and tools never used (remove them).
+F:
+- How would you detect that two tools are being confused?
+
+@@ Load tools on demand | Medium | Tooling
+Q: Implement dynamic tool loading: the agent starts with a small active tool set plus a `find_tools(query)` meta-tool that searches the catalogue and activates matches, and the dispatcher only allows active tools.
+A:
+```python
+import re
+
+
+class DynamicTools:
+    def __init__(self, catalogue: dict[str, str], initial: set[str], max_active: int = 6) -> None:
+        self.catalogue, self.active, self.max_active = catalogue, set(initial), max_active
+
+    def find_tools(self, query: str, k: int = 2) -> list[str]:
+        q = set(re.findall(r"[a-z]+", query.lower()))
+        scored = sorted(((len(q & set(re.findall(r"[a-z]+", desc.lower()))), name)
+                         for name, desc in self.catalogue.items() if name not in self.active), reverse=True)
+        found = [name for score, name in scored[:k] if score > 0]
+        room = self.max_active - len(self.active)
+        self.active.update(found[:max(0, room)])
+        return found[:max(0, room)]
+
+    def dispatch(self, name: str) -> str:
+        if name not in self.active:
+            raise PermissionError(f"{name} is not loaded; call find_tools first")
+        return f"called {name}"
+
+
+catalogue = {"search_policies": "search HR and travel policies", "get_fx_rate": "currency exchange rate lookup",
+             "book_room": "book a meeting room", "get_payslip": "employee payslip and salary details"}
+dt = DynamicTools(catalogue, initial={"search_policies"})
+try:
+    dt.dispatch("get_fx_rate")
+    raise AssertionError
+except PermissionError:
+    pass
+assert dt.find_tools("what is the exchange rate for currency GBP") == ["get_fx_rate"]
+assert dt.dispatch("get_fx_rate") == "called get_fx_rate"
+```
+
+Activation should still respect permissions: `find_tools` must only search the tools this user and assistant are allowed to have, otherwise it becomes a privilege-escalation path. Adding tools mid-run changes the prompt, which costs prompt-cache hits, so batch the loading where possible.
+F:
+- How would you stop `find_tools` from exposing tools the user isn't entitled to?
+
+@@ Testing strategy for agents | Medium | Testing
+Q: Describe a layered testing strategy for a tool-using agent.
+A:
+1. Unit tests: each tool (validation, authorisation, business rules, error mapping), parsers, policy rules, and state reducers. Fast and deterministic.
+2. Control-flow tests with a scripted fake LLM: routing, loops, retries, approvals, stop conditions, error recovery and checkpoint and resume. They assert the trajectory and the state, not the wording.
+3. Integration tests against simulated backends (fake airline, fake ledger) with fixtures: agent plus real prompts plus a real model on a small scenario set, asserting final-state checks.
+4. Evaluation suites: larger scenario sets with task success, trajectory checks, safety and red-team cases, and pass^k reliability over repeated runs. These run in CI on prompt, model or tool changes.
+5. Chaos and fault injection: tool timeouts, 429s and malformed responses. The agent must degrade gracefully.
+6. Shadow and canary runs in production with monitoring.
+
+Design for testability: inject the model client, tools and clock, keep side effects behind interfaces, and make every run replayable from its trace.
+F:
+- Which layer catches prompt regressions, and which catches code regressions?
+
+@@ Simulated backends for agent tests | Medium | Testing
+Q: Build a small simulated airline backend (search, hold and confirm, with seat inventory and holds that expire), which agent tests can use deterministically instead of real APIs.
+A:
+```python
+class FakeAirline:
+    def __init__(self, flights: dict[str, int], clock, hold_ttl: float = 900) -> None:
+        self.seats, self.clock, self.ttl = dict(flights), clock, hold_ttl
+        self.holds: dict[str, tuple[str, float]] = {}
+        self.tickets: list[str] = []
+        self._n = 0
+
+    def _expire(self) -> None:
+        for hid, (flight, ts) in list(self.holds.items()):
+            if self.clock() - ts > self.ttl:
+                self.seats[flight] += 1
+                del self.holds[hid]
+
+    def search(self) -> dict[str, int]:
+        self._expire()
+        return {f: s for f, s in self.seats.items() if s > 0}
+
+    def hold(self, flight: str) -> str:
+        self._expire()
+        if self.seats.get(flight, 0) <= 0:
+            raise RuntimeError(f"{flight} sold out")
+        self.seats[flight] -= 1
+        self._n += 1
+        hid = f"H{self._n}"
+        self.holds[hid] = (flight, self.clock())
+        return hid
+
+    def confirm(self, hold_id: str) -> str:
+        self._expire()
+        if hold_id not in self.holds:
+            raise RuntimeError("hold expired or unknown")
+        flight, _ = self.holds.pop(hold_id)
+        self.tickets.append(flight)
+        return f"TKT-{flight}"
+
+
+t = [0.0]
+api = FakeAirline({"LH903": 1, "BA912": 2}, clock=lambda: t[0])
+h = api.hold("LH903")
+assert api.search() == {"BA912": 2}
+t[0] = 1_000
+assert api.search() == {"LH903": 1, "BA912": 2}
+try:
+    api.confirm(h)
+    raise AssertionError
+except RuntimeError as e:
+    assert "expired" in str(e)
+h2 = api.hold("LH903")
+assert api.confirm(h2) == "TKT-LH903" and api.tickets == ["LH903"]
+```
+
+Simulators let you test the nasty cases (sold out between search and hold, expired holds, partial failures) that are hard to reproduce against real supplier sandboxes. Keep the simulator's behaviour aligned with the real API through contract tests against recorded responses.
+F:
+- How do you keep a simulator from drifting away from the real API's behaviour?
+
+@@ Fault injection for agents | Medium | Testing
+Q: Implement a fault-injection wrapper for tools (random timeouts, errors and slow responses with a seeded RNG), and use it to check that an agent's retry logic still completes most tasks.
+A:
+```python
+import random
+from typing import Callable
+
+
+def with_faults(fn: Callable, rng: random.Random, p_error: float = 0.2, p_timeout: float = 0.1) -> Callable:
+    def wrapped(*args, **kwargs):
+        r = rng.random()
+        if r < p_timeout:
+            raise TimeoutError("injected timeout")
+        if r < p_timeout + p_error:
+            raise ConnectionError("injected 503")
+        return fn(*args, **kwargs)
+    return wrapped
+
+
+def call_with_retries(fn: Callable, attempts: int = 3):
+    last = None
+    for _ in range(attempts):
+        try:
+            return fn()
+        except (TimeoutError, ConnectionError) as e:
+            last = e
+    raise last
+
+
+rng = random.Random(42)
+flaky_lookup = with_faults(lambda: "ok", rng)
+successes = 0
+for _ in range(1_000):
+    try:
+        call_with_retries(flaky_lookup)
+        successes += 1
+    except (TimeoutError, ConnectionError):
+        pass
+assert successes > 950
+```
+
+With a 30% per-call fault rate, three attempts give about 97% success (1 - 0.3³). Run the agent end to end under injected faults in CI, and check that failures produce graceful messages and correct compensations, never partial side effects. Chaos tests in staging (dependency outages, slow LLM responses) validate the circuit breakers and timeouts.
+F:
+- What should an agent tell the user when a critical tool is down?
+
+@@ Replay an agent run for debugging | Medium | Debugging
+Q: Record an agent run's model responses and tool results, then replay it deterministically against new code, detecting the first point where the new code diverges (a different tool call).
+A:
+```python
+class Divergence(Exception):
+    pass
+
+
+class Recorder:
+    def __init__(self) -> None:
+        self.events: list[dict] = []
+
+    def llm(self, real, messages):
+        out = real(messages)
+        self.events.append({"kind": "llm", "out": out})
+        return out
+
+    def tool(self, real, name, args):
+        out = real(name, args)
+        self.events.append({"kind": "tool", "name": name, "args": args, "out": out})
+        return out
+
+
+class Replayer:
+    def __init__(self, events: list[dict]) -> None:
+        self.events, self.i = events, 0
+
+    def _next(self, kind: str) -> dict:
+        ev = self.events[self.i]
+        self.i += 1
+        if ev["kind"] != kind:
+            raise Divergence(f"step {self.i}: expected {ev['kind']}, got {kind}")
+        return ev
+
+    def llm(self, _real, messages):
+        return self._next("llm")["out"]
+
+    def tool(self, _real, name, args):
+        ev = self._next("tool")
+        if (ev["name"], ev["args"]) != (name, args):
+            raise Divergence(f"step {self.i}: recorded {ev['name']}{ev['args']}, new code called {name}{args}")
+        return ev["out"]
+
+
+def agent(io, llm, tool, currency_arg: str = "pair"):
+    plan = io.llm(llm, ["convert 100 GBP"])
+    rate = io.tool(tool, "get_fx", {currency_arg: plan})
+    return io.llm(llm, [f"rate={rate}"])
+
+
+responses = iter(["GBPUSD", "About $127"])
+rec = Recorder()
+assert agent(rec, lambda m: next(responses), lambda n, a: 1.27) == "About $127"
+assert agent(Replayer(rec.events), None, None) == "About $127"
+try:
+    agent(Replayer(rec.events), None, None, currency_arg="symbol")
+    raise AssertionError
+except Divergence as e:
+    assert "new code called get_fx{'symbol': 'GBPUSD'}" in str(e)
+```
+
+Replays reproduce production bugs locally without calling models or touching real systems, and show exactly where a code change alters behaviour. Scrub sensitive data from recordings, and store them with traces under the same access controls.
+F:
+- What makes a divergence expected rather than a bug?
+
+@@ Versioning agents and workflows | Medium | Operations
+Q: How do you version an agent (prompts, tools, graph, model) so behaviour changes are controlled and traceable?
+A:
+- Treat the agent as a release artefact: the graph or code version, prompt versions, the tool set and schema versions, the model and deployment versions, guardrail policies and the parameters, combined into one agent version (a manifest), stored in the registry.
+- Every run records the agent version (and its component versions) in its state and traces.
+- Changes go through CI: unit tests, control-flow tests with fakes, an evaluation gate on scenario suites, and a security review for new tools or permissions.
+- Rollout: canary by traffic share or tenant, with automatic comparison, and a rollback that repoints the version.
+- Compatibility: tool schemas are versioned (additive changes are preferred), and state schemas are versioned with migrations for in-flight runs.
+- Documentation: a changelog per version for model-risk and audit, including why the change was made and its evaluation results.
+F:
+- What's the difference between versioning a prompt and versioning an agent?
+
+@@ Migrating in-flight runs across versions | Medium | Operations
+Q: Some agent runs wait days for approvals. When you deploy a new version with a changed state schema, how do you handle in-flight runs? Implement a chained state upgrader.
+A:
+```python
+def v1_to_v2(s: dict) -> dict:
+    s = dict(s)
+    s["approvals"] = [s.pop("approval")] if s.get("approval") else []
+    return {**s, "schema": 2}
+
+
+def v2_to_v3(s: dict) -> dict:
+    return {**s, "budget": s.get("budget", {"limit": "1.00", "spent": "0.00"}), "schema": 3}
+
+
+MIGRATIONS = {1: v1_to_v2, 2: v2_to_v3}
+CURRENT = 3
+
+
+def upgrade(state: dict) -> dict:
+    s = dict(state)
+    while s.get("schema", 1) < CURRENT:
+        s = MIGRATIONS[s.get("schema", 1)](s)
+    return s
+
+
+old = {"schema": 1, "task": "refund INV-7", "approval": {"ticket": 12, "status": "pending"}}
+new = upgrade(old)
+assert new == {"schema": 3, "task": "refund INV-7", "approvals": [{"ticket": 12, "status": "pending"}],
+               "budget": {"limit": "1.00", "spent": "0.00"}}
+assert upgrade(new) == new
+```
+
+Strategies:
+- Pinning: in-flight runs continue on the old version's code, and new runs start on the new version. This is safest, but you must keep old workers running until drained (workflow engines support this).
+- Migrating: upgrade the state on load with chained, tested migrations (as above), so every version can read old checkpoints.
+- For behavioural changes mid-run (a new approval step), decide explicitly: either apply it from the next step, or only to new runs.
+
+Test migrations against real checkpoint samples, and never delete old code paths while runs still depend on them.
+F:
+- When would you pin rather than migrate?
+
+@@ Multi-tenant agent platform concerns | Medium | Platform architecture
+Q: LLM Suite hosts agents for many business lines. What must a multi-tenant agent platform provide?
+A:
+- Isolation: per-tenant state, memory, checkpoints, vector indexes and caches, and strict tenant scoping in every data access (enforced in a data-access layer). Information barriers where needed.
+- Identity and authorisation: user and agent identities, on-behalf-of tokens to downstream systems, and tenant-specific tool catalogues and policies.
+- Quotas and fairness: per-tenant token, cost and concurrency limits, fair scheduling of background jobs, and protection from noisy neighbours.
+- Configuration: tenant-level assistants, prompts, models, guardrail policies and autonomy tiers, with guardrails that tenants can tighten but never loosen below the platform minimum.
+- Observability and chargeback: per-tenant metrics, traces, cost reports and alerting.
+- Governance: per-tenant evaluation gates, model-risk records, audit logs, data retention and deletion.
+- Reliability: bulkheads (one tenant's runaway agent can't exhaust shared workers), priority tiers and regional deployment for data residency.
+F:
+- Which of these controls must the platform enforce rather than trust tenants to implement?
+
+@@ SLOs for agents | Medium | Operations
+Q: What SLOs make sense for an agent service, which does multi-step work rather than single responses?
+A:
+- Availability: the fraction of runs that start and reach a terminal state without platform errors.
+- Latency: time to first visible progress (for example a status event under 2 seconds), and time to completion per task type (p95 under N seconds for interactive tasks, or a deadline for background jobs).
+- Task success: the fraction of runs completing successfully, as verified by final-state checks or downstream confirmation, per task type. Often an objective rather than a hard SLO, because it depends on inputs.
+- Escalation rate within a target band (too high means the agent isn't useful, and zero may mean it's over-confident).
+- Safety: zero unauthorised actions, and policy-violation rate below a threshold. These are treated as incidents rather than budgets.
+- Cost per successful task within budget.
+
+Measure per tenant and task type, with error budgets for availability and latency. Quality objectives drive release gates and reviews rather than paging.
+F:
+- Why shouldn't task success rate page the on-call engineer?
+
+@@ Fair scheduling of agent jobs across tenants | Hard | Platform architecture
+Q: Background agent jobs from many tenants share a worker pool. Implement weighted deficit round robin, so each tenant gets throughput proportional to its weight, and a flood from one tenant can't starve the others.
+A:
+```python
+from collections import deque
+
+
+def deficit_round_robin(queues: dict[str, deque], weights: dict[str, int], quantum: int = 10,
+                        max_jobs: int = 100) -> list[tuple[str, str]]:
+    deficit = {t: 0 for t in queues}
+    order: list[tuple[str, str]] = []
+    while any(queues.values()) and len(order) < max_jobs:
+        for tenant, q in queues.items():
+            if not q:
+                deficit[tenant] = 0
+                continue
+            deficit[tenant] += quantum * weights[tenant]
+            while q and q[0]["cost"] <= deficit[tenant] and len(order) < max_jobs:
+                job = q.popleft()
+                deficit[tenant] -= job["cost"]
+                order.append((tenant, job["id"]))
+    return order
+
+
+queues = {
+    "treasury": deque({"id": f"t{i}", "cost": 10} for i in range(50)),
+    "hr": deque({"id": f"h{i}", "cost": 10} for i in range(3)),
+    "risk": deque({"id": f"r{i}", "cost": 20} for i in range(10)),
+}
+order = deficit_round_robin(queues, {"treasury": 1, "hr": 1, "risk": 2}, max_jobs=12)
+first12 = [t for t, _ in order]
+assert first12.count("hr") == 3 and first12.count("risk") >= 3 and first12.count("treasury") <= 6
+```
+
+Costs can be estimated tokens or run time, so heavy jobs count more than light ones. HR's three jobs all run within the first rounds despite Treasury's 50-job flood. Combine this with per-tenant concurrency caps and priority classes (interactive over background).
+F:
+- How would you add a priority lane for interactive requests without starving batch jobs?
+
+@@ Backpressure in agent pipelines | Medium | Concurrency
+Q: A producer enqueues documents faster than agent workers can process them. Implement backpressure with a bounded asyncio queue, so the producer slows down instead of exhausting memory, and verify the queue never exceeds its bound.
+A:
+```python
+import asyncio
+
+
+async def pipeline(n_items: int, maxsize: int, workers: int) -> dict:
+    q: asyncio.Queue = asyncio.Queue(maxsize=maxsize)
+    peak = 0
+    done: list[int] = []
+
+    async def producer():
+        nonlocal peak
+        for i in range(n_items):
+            await q.put(i)
+            peak = max(peak, q.qsize())
+        for _ in range(workers):
+            await q.put(None)
+
+    async def worker():
+        while (item := await q.get()) is not None:
+            await asyncio.sleep(0.002)
+            done.append(item)
+
+    await asyncio.gather(producer(), *(worker() for _ in range(workers)))
+    return {"processed": len(done), "peak_queue": peak}
+
+
+out = asyncio.run(pipeline(n_items=100, maxsize=5, workers=3))
+assert out["processed"] == 100 and out["peak_queue"] <= 5
+```
+
+`await q.put()` blocks when the queue is full, which pushes back on the producer automatically. Across services, backpressure comes from bounded broker queues, consumer lag monitoring, rate limits (429 with `Retry-After`) and autoscaling workers on queue depth. Without it, a burst (a morning of disruptions) turns into memory exhaustion or a provider quota wall.
+F:
+- What should the API tier do when the internal queue is full?
+
+@@ Cross-user isolation in shared agents | Medium | Security
+Q: One agent deployment serves thousands of users concurrently. What can leak between users, and how do you prevent it?
+A:
+Leak paths:
+- Shared mutable state in the process: module-level caches, global variables, a reused conversation object, or a tool client holding the last user's token.
+- Caches (semantic caches, tool-result caches) keyed without the user or entitlement scope.
+- Memory stores and checkpoints with wrong namespace keys (the thread id reused, or guessable).
+- Logs and traces visible across teams, and evaluation datasets built from production.
+- Model context: previous users' data in few-shot examples, or long-lived sessions reused across users.
+
+Prevention:
+- A per-request context object (identity, tokens, tenant), passed explicitly or through contextvars, never globals.
+- Unguessable thread ids, bound to the owner and checked on every access.
+- Cache keys that include the user or entitlement scope, and no caching of personalised answers.
+- Namespaced stores (LangGraph Store namespaces per user), with access checks in the data layer.
+- Tests: concurrent multi-user integration tests asserting no cross-contamination, and fuzzing thread ids.
+F:
+- How would you test for a cross-user leak under concurrency?
+
+@@ Explain what the agent did | Easy | UX
+Q: Turn an agent's action log into a short, user-friendly explanation of what it did, with approvals noted and sensitive values masked.
+A:
+```python
+import re
+
+TEMPLATES = {
+    "search_flights": ("Searched for alternative flights to {destination}.", "Couldn't search flights to {destination}."),
+    "hold_seat": ("Held a seat on {flight}.", "Couldn't hold a seat on {flight}."),
+    "issue_refund": ("Issued a refund of {amount}.", "Couldn't issue a refund of {amount}."),
+    "update_hotel": ("Moved your hotel booking to {date}.", "Couldn't move your hotel booking to {date}."),
+}
+
+
+def mask(value: str) -> str:
+    return re.sub(r"\b\d{8,}\b", lambda m: "****" + m.group(0)[-4:], value)
+
+
+def explain(action_log: list[dict]) -> list[str]:
+    lines = []
+    for a in action_log:
+        done_tpl, fail_tpl = TEMPLATES.get(a["tool"], ("Performed {tool}.", "Couldn't perform {tool}."))
+        tpl = fail_tpl if a.get("status") == "failed" else done_tpl
+        text = tpl.format(tool=a["tool"], **{k: mask(str(v)) for k, v in a.get("args", {}).items()})
+        if a.get("approved_by"):
+            text += f" (approved by {a['approved_by']})"
+        lines.append(text)
+    return lines
+
+
+log = [{"tool": "search_flights", "args": {"destination": "Frankfurt"}},
+       {"tool": "hold_seat", "args": {"flight": "LH903"}},
+       {"tool": "issue_refund", "args": {"amount": "£412.50 to account 12345678"}, "approved_by": "you"},
+       {"tool": "update_hotel", "args": {"date": "2 Oct"}, "status": "failed"}]
+assert explain(log) == [
+    "Searched for alternative flights to Frankfurt.",
+    "Held a seat on LH903.",
+    "Issued a refund of £412.50 to account ****5678. (approved by you)",
+    "Couldn't move your hotel booking to 2 Oct.",
+]
+```
+
+Failures get their own wording, so the user can see what didn't happen. Generating the explanation from the action log (not from the model's memory) guarantees it reflects what actually happened. An LLM can then polish the tone while being grounded in the log.
+F:
+- Why should explanations come from the action log rather than the model's narrative?
+
+@@ Tamper-evident audit trail for agent actions | Medium | Governance
+Q: Implement a hash-chained audit log for agent actions, so any modification or deletion of past records is detectable during verification.
+A:
+```python
+import hashlib
+import json
+
+
+def _hash(record: dict, prev: str) -> str:
+    return hashlib.sha256((prev + json.dumps(record, sort_keys=True)).encode()).hexdigest()
+
+
+class AuditLog:
+    def __init__(self) -> None:
+        self.entries: list[dict] = []
+
+    def append(self, record: dict) -> str:
+        prev = self.entries[-1]["hash"] if self.entries else "genesis"
+        h = _hash(record, prev)
+        self.entries.append({"record": record, "prev": prev, "hash": h})
+        return h
+
+    def verify(self) -> int | None:
+        prev = "genesis"
+        for i, e in enumerate(self.entries):
+            if e["prev"] != prev or _hash(e["record"], prev) != e["hash"]:
+                return i
+            prev = e["hash"]
+        return None
+
+
+log = AuditLog()
+log.append({"run": "r1", "tool": "get_invoice", "actor": "agent:refunds@1.4"})
+log.append({"run": "r1", "tool": "issue_refund", "amount": "90.00", "approved_by": "tom"})
+log.append({"run": "r1", "event": "completed"})
+assert log.verify() is None
+log.entries[1]["record"]["amount"] = "9000.00"
+assert log.verify() == 1
+del log.entries[1]
+assert log.verify() == 1
+```
+
+Editing an amount or deleting an entry breaks the chain from that point on. Chaining detects tampering but doesn't prevent it. Anchor the latest hash externally (write it periodically to WORM storage or a separate system), and store the logs in append-only stores with restricted access. Record the agent version, the user and the approver on every action.
+F:
+- Why must the head hash be anchored somewhere the log writer can't modify?
+
+@@ Design an agentic orchestration platform for LLM Suite | Hard | System design
+Q: Design the shared agent runtime for LLM Suite, so application teams can build agents that are secure, reliable and observable by default.
+A:
+Core services:
+1. Agent runtime: a graph-based orchestration (for example LangGraph) running on stateless workers with durable checkpoints (Postgres), interrupts for human-in-the-loop, streaming of events, and deadline and budget enforcement.
+2. LLM gateway: model routing across Azure OpenAI, Bedrock and self-hosted models, quotas, retries and fallbacks, prompt caching, cost metering and content filtering.
+3. Tool plane: an MCP gateway fronting approved MCP servers (a registry with owners, scopes, versions and risk tiers), per-request authorisation with on-behalf-of tokens, argument validation, rate limits and audit.
+4. Agent plane: A2A endpoints for cross-team agents (Agent Cards in a registry, signed cards, task lifecycle tracking).
+5. Policy and approvals: a policy engine for tool calls (auto, approve or deny), an approval service with four-eyes rules, and notifications.
+6. Memory service: per-user and per-tenant stores with namespaces, inspection and deletion APIs, retention and poisoning controls.
+7. Observability and evaluation: OpenTelemetry tracing across agents, tools and models, evaluation pipelines and gates, replay tooling and dashboards.
+8. Governance: an agent registry (owners, versions, risk tier, model-risk status), change management, kill switches per agent and tenant.
+
+Developer experience: templates and SDKs, a local fake stack (fake LLM, simulated tools), CI evaluation templates, and paved-road defaults. Teams write the graph and tools, and the platform provides the controls.
+F:
+- What would you ship in the first quarter, and what would wait?
+- Which platform controls should be impossible for teams to disable?
+
+@@ Whiteboard: disruption recovery with cooperating agents | Hard | System design
+Q: In 45 minutes, design a multi-agent system that recovers travellers' trips after airline disruptions at scale (120,000+ trips per year): flight, hotel and dining agents cooperating, owned by different teams.
+A:
+Requirements: recover within minutes, respect policy and preferences, never double-book or leave partial states, ask travellers only when necessary, and be auditable.
+
+Architecture:
+- Event ingestion: airline disruption feeds onto a queue, then a trip-matching service, which creates one recovery run per affected trip (idempotent by trip and disruption id).
+- Orchestrator agent (owned by the trip team): builds the recovery plan and coordinates the domain agents over A2A: a flight agent (airline team), a hotel agent (lodging team) and a dining agent (partner team). Each advertises an Agent Card with skills and auth requirements. Tasks are tracked through their states (submitted, working, input-required, completed, failed), with streaming or push notifications.
+- Saga coordination: the orchestrator runs hold flight, then adjust the hotel, then move dining, then confirm, with compensations (release the hold, restore the hotel), idempotency keys per step, and a persisted saga log.
+- Human-in-the-loop: the traveller's approval via app or push for options outside the pre-authorised rules. An `input-required` task state pauses the flow durably.
+- Decision logic: deterministic ranking tools for options (constraints, policy, cost), and LLMs for interpreting preferences, explaining trade-offs and handling unusual cases.
+- Reliability: per-agent timeouts and circuit breakers, fallbacks (rail options, a human travel desk), deadline propagation, fair scheduling during mass disruptions, and backpressure.
+- Security: per-agent least-privilege credentials, signed Agent Cards, on-behalf-of traveller tokens, and an audit trail of every action.
+- Observability: end-to-end traces across A2A hops, recovery time (for example from 45 minutes to 90 seconds), success and acceptance rates, cost deltas and escalations.
+F:
+- What happens if the hotel agent succeeds but its response is lost before the orchestrator records it?
+- How do you roll out a new version of the flight agent without breaking in-flight recoveries?

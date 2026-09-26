@@ -74,48 +74,62 @@ def coding(n: int, slug: str, title: str, summary: str, jd: str) -> Section:
 
 
 SECTIONS: list[Section] = [
-    coding(1, "arrays_strings_hashing", "Arrays, Strings & Hashing",
-           "The most reported JPMorganChase HackerRank territory: array manipulation, string processing, "
-           "counting with hash maps and sets, matrix basics and number/string conversions.",
-           "Write secure, high-quality production code and maintain algorithms that integrate with existing systems."),
-    coding(2, "two_pointers_sliding_window_intervals", "Two Pointers, Sliding Window, Prefix Sums, Intervals & Sorting",
-           "Linear-time patterns that turn O(n^2) brute force into O(n): two pointers, fixed and variable windows, "
-           "prefix sums with hash maps, interval merging/scheduling and custom sorting.",
-           "Design, develop and troubleshoot software using creative approaches to solve complex technical challenges."),
-    coding(3, "stacks_queues_linked_lists", "Stacks, Queues, Linked Lists & Data-Structure Design",
-           "Stacks (parsing, monotonic stacks), queues and deques, linked-list surgery, and classic "
-           "design-a-structure problems such as LRU/LFU caches, min stack and hit counters.",
-           "Maintain algorithms that integrate with existing systems; operational stability."),
-    coding(4, "trees_heaps_tries", "Trees, BSTs, Heaps & Tries",
-           "Binary-tree traversal and recursion, BST properties, serialization, lowest common ancestors, "
-           "heaps for top-k/streaming/scheduling problems, and tries for prefix search.",
-           "Write and maintain algorithms that integrate with existing systems."),
-    coding(5, "graphs_grids", "Graphs & Grids",
-           "BFS/DFS on grids and graphs, topological sort for dependency ordering (think agent/task DAGs), "
-           "union-find, shortest paths (Dijkstra, 0-1 BFS, Bellman-Ford), MST and cycle detection.",
-           "Agentic orchestration (DAG scheduling), system design fundamentals."),
-    coding(6, "dp_greedy_backtracking_binary_search", "Dynamic Programming, Greedy, Backtracking, Binary Search & Bits",
-           "1-D/2-D DP, knapsack and string DP, greedy proofs, backtracking with pruning, binary search on the "
-           "answer, and bit manipulation.",
-           "Creative approaches to complex technical challenges; algorithms that integrate with existing systems."),
-    coding(7, "python_coding_internals_async", "Python Coding, Internals, Concurrency & asyncio",
-           "Python-specific coding: output prediction, data model, decorators, generators, context managers, "
-           "descriptors, dataclasses and typing, collections/itertools, threading/multiprocessing and asyncio.",
-           "Proficiency in Python (FastAPI); secure, high-quality production code."),
-    coding(8, "sql_nosql_data_wrangling", "SQL, NoSQL & Data Wrangling",
-           "SQL coding on banking-style schemas (joins, aggregates, window functions, CTEs, gaps and islands), "
-           "each verified with sqlite3, plus NoSQL access patterns and Python data processing (CSV, JSON, logs).",
-           "Modern database querying languages; NoSQL databases; large corporate environment."),
-    coding(9, "practical_lld_fastapi_code_review", "Practical Coding, Low-Level Design, FastAPI & Code Review",
-           "Interview-style practical problems: rate limiters, ledgers, idempotency, retries and circuit breakers, "
-           "queue consumers, FastAPI endpoints tested with TestClient, and 'find the bugs' code-review exercises.",
-           "Python (FastAPI); microservices and APIs; messaging queues; testing and operational stability; SDLC."),
-    coding(10, "genai_agentic_coding", "GenAI & Agentic Coding: RAG, LangGraph, MCP, A2A, LLM Clients",
-           "Hands-on GenAI coding: tokenization and chunking, vector and hybrid retrieval, evaluation metrics, "
-           "streaming parsers, tool-call dispatch, guardrails, LangGraph graphs, MCP and A2A message handling, "
-           "and resilient Azure OpenAI / Bedrock client code.",
-           "Azure OpenAI and AWS Bedrock; LLMs and LangGraph agents; A2A, MCP, AI skills, personal assistants, "
-           "agentic orchestrators."),
+    coding(1, "llm_fundamentals", "LLM Fundamentals & Inference",
+           "How large language models work and how they are served: transformers and attention, tokenization, "
+           "embeddings, decoding and sampling, context windows, KV cache, latency and throughput, fine-tuning "
+           "versus RAG, with NumPy/Python coding tasks that implement the core pieces.",
+           "Proficiency working with large language models; build AI/ML solutions."),
+    coding(2, "prompting_context_structured_output", "Prompting, Context Engineering & Structured Output",
+           "Prompt design, system prompts, few-shot and reasoning models, context engineering and token budgets, "
+           "structured output with JSON Schema and Pydantic, function-calling formats, prompt versioning, and "
+           "coding tasks such as template rendering, context trimming and JSON repair with validation.",
+           "Proficiency working with LLMs; write secure, high-quality production code."),
+    coding(3, "rag_retrieval", "Retrieval-Augmented Generation (RAG)",
+           "End-to-end RAG: ingestion and chunking, embeddings, vector indexes, hybrid search (BM25 + vectors), "
+           "reciprocal rank fusion, reranking, query rewriting, entitlement-aware retrieval, citations and "
+           "grounding, with runnable implementations of each building block.",
+           "Build AI/ML solutions for the LLM Suite platform; algorithms that integrate with existing systems."),
+    coding(4, "llm_evaluation_observability", "LLM Evaluation, Testing & Observability",
+           "Golden datasets, retrieval and generation metrics, LLM-as-judge and calibration, agent trajectory "
+           "evaluation, CI evaluation gates, tracing (LangSmith, OpenTelemetry GenAI conventions), cost and latency "
+           "monitoring, online experiments, with metric implementations you can run.",
+           "Testing and operational stability; strong understanding of the SDLC."),
+    coding(5, "agentic_patterns_orchestration", "Agentic Patterns & Orchestration",
+           "ReAct, plan-and-execute, reflection, routing, supervisor and multi-agent designs, tool-calling loops, "
+           "memory, human approval, loop guards, parallel tool execution, DAG orchestration and sagas with "
+           "compensation, all coded against fake LLMs so the logic is testable.",
+           "Agentic systems with modern agentic frameworks; agentic orchestrators; turn early patterns into "
+           "production-ready capabilities."),
+    coding(6, "langgraph_langchain", "LangGraph & LangChain in Practice",
+           "LangGraph 1.x hands-on: StateGraph and reducers, conditional edges, Send and Command, subgraphs, "
+           "checkpointers and threads, interrupts for human-in-the-loop, streaming modes, the Store for long-term "
+           "memory, time travel, and LangChain 1.x agents and middleware. Snippets run against the installed "
+           "langgraph package.",
+           "Proficiency building agents with LangGraph."),
+    coding(7, "mcp_a2a_skills_assistants", "MCP, A2A, Agent Skills & Personal AI Assistants",
+           "Model Context Protocol (tools, resources, prompts, transports, authorization and the stateless "
+           "2026-07-28 revision), the A2A protocol v1.0 (Agent Cards, tasks, parts, streaming, push notifications), "
+           "Agent Skills, and personal-assistant design, with JSON-RPC and protocol handlers you can run.",
+           "Knowledge of A2A, MCP, AI skills development, personal AI assistants and agentic orchestrators."),
+    coding(8, "azure_openai_bedrock_cloud_ai", "Azure OpenAI, AWS Bedrock & Cloud AI Infrastructure",
+           "Azure OpenAI (deployments, quotas, PTUs, content filtering, Entra ID auth, API Management as an AI "
+           "gateway), Amazon Bedrock (Converse API, Guardrails, Knowledge Bases, AgentCore, cross-Region "
+           "inference), multi-provider routing, rate-limit handling, streaming, elastic compute and GPU serving.",
+           "Implement GenAI services leveraging Azure OpenAI models and AWS Bedrock; public cloud architecture; "
+           "elastic compute."),
+    coding(9, "genai_services_fastapi", "Building GenAI Services: FastAPI, Streaming, Queues & NoSQL",
+           "Production GenAI microservices: FastAPI endpoints for chat and agents, SSE token streaming, async "
+           "concurrency and backpressure, long-running agent jobs on queues, conversation state in NoSQL, "
+           "semantic caching, per-tenant quotas and cost metering, containers and autoscaling. Endpoints are "
+           "tested with FastAPI's TestClient.",
+           "Python (FastAPI); microservices and APIs; elastic compute, NoSQL databases and messaging queues; "
+           "containerization."),
+    coding(10, "ai_security_responsible_ai", "AI Security, Guardrails & Responsible AI in a Bank",
+           "Prompt injection (direct and indirect), OWASP Top 10 for LLM and agentic applications, tool "
+           "permissioning and least privilege, PII redaction, output handling, data leakage and entitlements, "
+           "red teaming, model risk management and regulation, audit logging, with guardrail code you can run.",
+           "Write secure, high-quality production code; secure, reliable AI capabilities; technology controls "
+           "agenda."),
     Section("behavioural", "behavioural_questions", "Behavioural, Role & JPMorganChase",
             "Recruiter-screen, hiring-manager and HireVue-style questions: motivation, JPMorganChase and LLM Suite, "
             "the Business Principles, and STAR stories on collaboration, feedback, ownership and integrity.",
@@ -296,39 +310,43 @@ def render_section(section: Section, qs: list[Question]) -> str:
 
 
 ROOT_README = """
-# JPMorganChase · Software Engineer III – LLM Suite Engineering · Round 1 Coding Question Bank
+# JPMorganChase · Software Engineer III – LLM Suite Engineering · AI Interview Question Bank
 
-1,000 Round 1 coding questions (10 batches of 100) with tested Python solutions, complexity notes and
-likely follow-ups, built for the [Software Engineer III – LLM Suite Engineering – Senior Associate]({job})
-role (requisition 210746921, Corporate Technology, London). Two extra sections sit alongside the
-1,000: `behavioural_questions` (the earlier behavioural bank) and `resume_questions` (a deep dive on
-the candidate's resume). Every question has its own folder with a `README.md`.
+1,000 AI-focused interview questions (10 batches of 100) for the
+[Software Engineer III – LLM Suite Engineering – Senior Associate]({job}) role (requisition 210746921,
+Corporate Technology, London). Every question is tied to an AI line of the job description: LLMs, RAG,
+agents, LangGraph, MCP and A2A, Azure OpenAI and AWS Bedrock, GenAI services, evaluation and AI
+security. Coding questions come with tested Python solutions; concept questions come with model
+answers. Every question has its own folder with a `README.md`, plus likely follow-ups.
 
-## What the job description says, and what it means for Round 1
+Two extra sections sit alongside the 1,000: `resume_questions` (AI deep-dive on the candidate's
+resume) and `behavioural_questions` (the earlier behavioural bank, kept for reference).
 
-| JD line | What Round 1 is likely to test | Where to practise |
+## The AI parts of the job description, and where to practise them
+
+| JD line | What the interviewer is likely to probe | Batch |
 |---|---|---|
-| Write secure, high-quality production code and maintain algorithms that integrate with existing systems | Easy/medium DSA in HackerRank style, clean and readable code, edge cases | Batches 01–06 |
-| Design, develop and troubleshoot software using creative approaches | Problem decomposition, debugging, spotting bugs in someone else's code | Batches 02, 06, 09 |
-| Proficiency in Python (FastAPI); microservices and APIs | Python internals, asyncio, FastAPI endpoints with validation and tests | Batches 07, 09 |
-| Elastic compute, NoSQL databases and messaging queues; database querying languages; containerization | SQL (joins, windows, CTEs), NoSQL access patterns, idempotent queue consumers | Batches 08, 09 |
-| Build AI/ML and agentic systems on Azure and AWS; GenAI on Azure OpenAI and AWS Bedrock | Retry/fallback LLM clients, streaming, token budgets, structured output | Batch 10 |
-| LLMs and building agents with LangGraph | StateGraph, reducers, conditional edges, tool loops, checkpointing | Batch 10 |
-| A2A, MCP, AI skills, personal AI assistants, agentic orchestrators | JSON-RPC handlers, tool registries, agent cards, DAG orchestration | Batches 05, 10 |
-| System design, testing, operational stability, SDLC | Testable code, rate limiters, circuit breakers, assertions and pytest | Batch 09 |
-| Corporate Technology: Finance, Treasury, Risk, Compliance; technology controls | Banking-flavoured problems: ledgers, reconciliation, suspicious accounts, audit | Batches 08, 09 |
+| Proficiency working with large language models | Tokens, attention, sampling, context windows, KV cache, latency and cost | 01 |
+| Build AI/ML solutions … secure, reliable, production-ready | Prompt and context engineering, structured output, validation | 02 |
+| Build AI/ML solutions for the LLM Suite platform; algorithms that integrate with existing systems | Chunking, embeddings, hybrid search, reranking, entitlement-aware RAG | 03 |
+| Testing and operational stability; SDLC | Eval datasets, metrics, LLM-as-judge, CI gates, tracing | 04 |
+| Agentic systems with modern agentic frameworks; agentic orchestration | ReAct, supervisor, planning, tool loops, sagas, DAG orchestration | 05 |
+| Building agents with LangGraph | StateGraph, reducers, Send/Command, checkpointers, interrupts, streaming | 06 |
+| A2A, MCP, AI skills development, personal AI assistants | MCP servers and clients, A2A tasks and Agent Cards, skills, assistants | 07 |
+| Implement GenAI services on Azure OpenAI and AWS Bedrock; public cloud; elastic compute | Deployments, quotas, PTUs, Converse API, Guardrails, gateways, 429 handling | 08 |
+| Python (FastAPI); microservices and APIs; NoSQL; messaging queues; containerization | Streaming endpoints, async jobs, conversation stores, caching, autoscaling | 09 |
+| Write secure, high-quality code; technology controls agenda | Prompt injection, OWASP LLM Top 10, PII, tool permissions, model risk | 10 |
 
-## What Round 1 usually looks like
+## What the rounds usually look like for AI roles at JPMorganChase
 
 Candidate reports vary by team, so confirm the format with your recruiter.
 
-- HackerRank online assessment: usually two easy-to-medium problems in 60–90 minutes, sometimes with
-  multiple-choice or aptitude questions. Arrays, strings, hash maps, sorting, greedy and heaps come
-  up most.
-- Live technical screen: one or two LeetCode-medium problems in about 45 minutes, often after
-  10–20 minutes on past projects, followed by complexity and follow-up questions.
-- For this team, expect Python-specific and GenAI-flavoured coding (LangGraph, MCP, RAG, FastAPI) on
-  top of standard DSA, and a code-review mindset (security, naming, tests, concurrency).
+- Online assessment (HackerRank): coding problems, increasingly with an applied flavour.
+- Technical screen: a deep dive into past AI projects, then LLM/RAG/agent concepts, then live coding.
+  For AI roles, reported coding tasks include implementing retrieval pieces, parsing model output,
+  writing an agent loop, or building an API around a model.
+- Final rounds: GenAI system design (for example an enterprise LLM gateway or entitlement-aware RAG),
+  code review with a security lens, and behavioural questions.
 
 ## Sections
 
@@ -338,30 +356,34 @@ Candidate reports vary by team, so confirm the format with your recruiter.
 
 ## How to use this bank
 
-- Do the batches in order. 01–06 are the core DSA for the online assessment and live coding.
-  07–10 cover the Python, data, practical and GenAI depth this team adds.
-- Solve each problem out loud against a timer (about 20 minutes for Medium) before reading the
-  answer. State the brute force, then optimise, then test edge cases.
-- Every Python solution includes assertions. `python .qbuild/build.py --test` runs all of them.
+- Work batch by batch. Answer each question out loud before reading the model answer; for coding
+  questions, write the code first against the stated tests.
+- Every Python solution includes assertions and runs offline with fake LLMs where a model would be
+  called. `python .qbuild/build.py --test` executes all of them.
+- Fast-moving facts (MCP 2026-07-28, A2A v1.0, LangGraph 1.x, cloud service features) were checked in
+  September 2026. Re-check them before the interview.
 - Use the follow-ups as the interviewer's next move.
 
 ## Sources
 
-Problem selection draws on public reports of JPMorganChase interviews. Content was rephrased for
-compliance with licensing restrictions, and all solutions were written independently.
+Content was researched from the sources below and rephrased for compliance with licensing
+restrictions. Model answers are preparation material, not official JPMorganChase content.
 
 - [Job posting 210746921 (JPMorganChase careers)]({job})
-- [TechPrep: JPMorgan interview process 2026](https://www.techprep.app/blog/jpmorgan-interview-process)
-- [Interview Query: JPMorgan Chase software engineer guide](https://www.interviewquery.com/guides/jp-morgan-chase-software-engineer)
-- [JPMorgan-tagged LeetCode problems (snehasishroy/leetcode-companywise-interview-questions)](https://github.com/snehasishroy/leetcode-companywise-interview-questions/tree/master/jpmorgan)
-- [JPMorgan-tagged LeetCode problems (krishnadey30/LeetCode-Questions-CompanyWise)](https://github.com/krishnadey30/LeetCode-Questions-CompanyWise/blob/master/jpmorgan_alltime.csv)
-- [GeeksforGeeks: JPMorgan Chase on-campus interview experience](https://www.geeksforgeeks.org/interview-experiences/jpmorgan-chase-co-interview-experience-on-campus-2/)
-- [Soumendra Sahoo: JPMC Python developer interview questions](https://www.soumendrak.com/blog/jpmc-interview-experience/)
 - [Exponent: JP Morgan Chase AI engineer interview experience](https://www.tryexponent.com/experiences/jp-morgan-chase-ai-engineer-interview-3ef69d)
-- [1Point3Acres: JPMorgan Chase interview questions](https://www.1point3acres.com/interview/problems/company/jpmorgan)
-- [MCP specification](https://modelcontextprotocol.io/specification/2026-07-28/changelog)
+- [Glassdoor: JPMorganChase Applied AI/ML Associate interviews](https://www.glassdoor.com/Interview/JPMorganChase-Interview-Questions-E5224839.htm?filter.jobTitleExact=Applied%20AI/ML%20Associate)
+- [Medium: interviewing at JPMorgan Chase for an ML engineer role](https://medium.com/@nagapavithralagisetty/i-interviewed-at-jpmorgan-chase-for-an-ml-engineer-role-and-got-rejected-here-is-what-i-learned-cf65f2b31cc0)
+- [Dataford: JPMorganChase agentic AI engineer interview guide](https://dataford.io/interview-guides/jpmorganchase/agentic-ai-engineer)
+- [TechPrep: JPMorgan interview process 2026](https://www.techprep.app/blog/jpmorgan-interview-process)
+- [MCP specification 2026-07-28 changelog](https://modelcontextprotocol.io/specification/2026-07-28/changelog)
+- [A2A protocol: what's new in v1.0](https://a2a-protocol.org/latest/whats-new-v1/)
 - [A2A protocol specification](https://a2a-protocol.org/latest/specification/)
 - [LangGraph documentation](https://docs.langchain.com/oss/python/langgraph/overview)
+- [LangChain: human-in-the-loop middleware](https://docs.langchain.com/oss/python/langchain/human-in-the-loop)
+- [OWASP Top 10 for LLM Applications](https://genai.owasp.org/llm-top-10/)
+- [Microsoft Learn: Azure OpenAI in Foundry Models](https://learn.microsoft.com/en-us/azure/ai-foundry/openai/overview)
+- [AWS: Amazon Bedrock Converse API](https://docs.aws.amazon.com/bedrock/latest/userguide/conversation-inference.html)
+- [Bank of England: PRA SS1/23 model risk management principles](https://www.bankofengland.co.uk/prudential-regulation/publication/2023/may/model-risk-management-principles-for-banks-ss)
 """
 
 
