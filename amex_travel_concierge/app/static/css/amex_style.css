@@ -1,0 +1,1335 @@
+/* ==============================================================================
+   AMERICAN EXPRESS (AMEX) MOBILE APP DESIGN SYSTEM & ULTIMATE STYLING
+   Official Amex Palette: Deep Navy (#002663), Centurion (#00175a), Royal Blue (#0070d1)
+   Platinum Silver & Titanium Black Card Sheens, Embossed Typography
+   ============================================================================== */
+
+:root {
+  --amex-navy: #002663;
+  --amex-navy-dark: #00175a;
+  --amex-blue-primary: #0070d1;
+  --amex-blue-bright: #0099ff;
+  --amex-bg: #f4f6f9;
+  --amex-surface: #ffffff;
+  --amex-surface-subtle: #f8fafc;
+  --amex-border: #e2e8f0;
+  --amex-text-dark: #0f172a;
+  --amex-text-muted: #64748b;
+  --amex-text-light: #94a3b8;
+  
+  --amex-gold: #c5a059;
+  --amex-gold-gradient: linear-gradient(135deg, #d4af37 0%, #aa771c 50%, #f7e296 100%);
+  --amex-platinum-gradient: linear-gradient(135deg, #e5e9f0 0%, #b8c2cc 40%, #eef2f7 70%, #9aa8b6 100%);
+  --amex-centurion-gradient: linear-gradient(145deg, #1f2227 0%, #121316 45%, #2a2d33 75%, #0d0e10 100%);
+
+  --danger-red: #dc2626;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+  --success-green: #059669;
+  --success-bg: #ecfdf5;
+  --warning-amber: #d97706;
+  --warning-bg: #fffbeb;
+  
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  --shadow-card: 0 15px 30px rgba(0, 23, 90, 0.18);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: #0a1128;
+  color: var(--amex-text-dark);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-x: hidden;
+}
+
+/* ==============================================================================
+   TOP GLOBAL COCKPIT / SIMULATOR TOOLBAR
+   ============================================================================== */
+.top-cockpit {
+  width: 100%;
+  background: rgba(0, 23, 90, 0.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  color: #fff;
+}
+
+.cockpit-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.amex-box-logo {
+  background: #0070d1;
+  color: #ffffff;
+  font-weight: 900;
+  letter-spacing: -0.5px;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+  box-shadow: 0 2px 8px rgba(0, 112, 209, 0.5);
+  text-transform: uppercase;
+}
+
+.cockpit-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.cockpit-sub {
+  font-size: 11px;
+  color: #93c5fd;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.cockpit-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-cockpit {
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+}
+
+.btn-disrupt {
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.35);
+  animation: pulse-glow 2s infinite;
+}
+
+.btn-disrupt:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(239, 68, 68, 0.5);
+}
+
+.btn-reset {
+  background: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-reset:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.btn-toggle-frame {
+  background: rgba(0, 112, 209, 0.25);
+  color: #93c5fd;
+  border: 1px solid #0070d1;
+}
+
+.btn-toggle-frame:hover {
+  background: #0070d1;
+  color: #fff;
+}
+
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+}
+
+/* ==============================================================================
+   PHONE VIEWPORT CONTAINER (AMEX MOBILE APP FRAME)
+   ============================================================================== */
+.app-viewport-wrapper {
+  padding: 24px 0 48px;
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.mobile-phone-frame {
+  width: 414px;
+  height: 870px;
+  background: #ffffff;
+  border-radius: 46px;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.65), 0 0 0 10px #1e293b, 0 0 0 13px #334155;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Expanded full-screen desktop mode toggle */
+.app-viewport-wrapper.expanded-mode .mobile-phone-frame {
+  width: 1100px;
+  max-width: 95vw;
+  height: 90vh;
+  border-radius: 20px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+}
+
+/* Phone Notch / Dynamic Island */
+.phone-status-bar {
+  height: 44px;
+  background: var(--amex-navy);
+  color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 50;
+  flex-shrink: 0;
+}
+
+.dynamic-island {
+  width: 110px;
+  height: 22px;
+  background: #000000;
+  border-radius: 14px;
+  margin: 0 auto;
+}
+
+.phone-icons {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+}
+
+/* App Header */
+.amex-app-header {
+  background: var(--amex-navy);
+  padding: 12px 20px 16px;
+  color: #ffffff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.header-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  border: 1.5px solid var(--amex-gold);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--amex-gold);
+}
+
+.user-welcome-sub {
+  font-size: 11px;
+  color: #94a3b8;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.user-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+}
+
+.header-badges {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.badge-centurion {
+  background: rgba(197, 160, 89, 0.15);
+  border: 1px solid var(--amex-gold);
+  color: var(--amex-gold);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+
+.btn-notif-bell {
+  position: relative;
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.notif-bubble {
+  position: absolute;
+  top: -2px;
+  right: -4px;
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
+  border-radius: 50%;
+  border: 2px solid var(--amex-navy);
+}
+
+/* ==============================================================================
+   SCROLLABLE SCREEN CONTENT CONTAINER
+   ============================================================================== */
+.app-screen-scroll {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--amex-bg);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  scroll-behavior: smooth;
+}
+
+.app-screen-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.app-screen-scroll::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.tab-pane {
+  display: none;
+  padding: 16px;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tab-pane.active {
+  display: flex;
+}
+
+/* ==============================================================================
+   URGENT DISRUPTION BANNER IN MOBILE APP
+   ============================================================================== */
+.disruption-alert-card {
+  background: linear-gradient(135deg, #7f1d1d 0%, #991b1b 100%);
+  border: 1px solid #ef4444;
+  border-radius: 16px;
+  padding: 14px 16px;
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(220, 38, 38, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: slide-down 0.3s ease;
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.disruption-alert-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.alert-headline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+}
+
+.alert-badge {
+  background: rgba(255, 255, 255, 0.2);
+  font-size: 10px;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+}
+
+.alert-body-text {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #fecaca;
+}
+
+.alert-action-btn {
+  background: #ffffff;
+  color: #991b1b;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.alert-action-btn:hover {
+  background: #f8fafc;
+}
+
+/* ==============================================================================
+   ICONIC AMEX CARD VISUAL (CENTURION & PLATINUM)
+   ============================================================================== */
+.card-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.amex-physical-card {
+  width: 100%;
+  aspect-ratio: 1.586;
+  border-radius: 18px;
+  padding: 20px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  user-select: none;
+}
+
+.amex-physical-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 20px 35px rgba(0, 23, 90, 0.25);
+}
+
+/* Centurion Black Card Edition */
+.card-centurion {
+  background: var(--amex-centurion-gradient);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e2e8f0;
+}
+
+.card-centurion::before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 250px;
+  height: 250px;
+  background: radial-gradient(circle, rgba(197, 160, 89, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Platinum Card Edition */
+.card-platinum {
+  background: var(--amex-platinum-gradient);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  color: #1e293b;
+}
+
+/* Centurion Roman Watermark */
+.card-watermark {
+  position: absolute;
+  right: 18px;
+  bottom: 12px;
+  width: 90px;
+  height: 90px;
+  opacity: 0.12;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="45" fill="none" stroke="%23ffffff" stroke-width="4"/><path d="M50 20 L58 42 L80 42 L62 56 L69 78 L50 64 L31 78 L38 56 L20 42 L42 42 Z" fill="%23ffffff"/></svg>');
+  background-repeat: no-repeat;
+  background-size: contain;
+  pointer-events: none;
+}
+
+.card-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 2;
+}
+
+.card-brand-title {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.card-chip {
+  width: 38px;
+  height: 28px;
+  background: linear-gradient(135deg, #d4af37 0%, #fef08a 50%, #996515 100%);
+  border-radius: 5px;
+  position: relative;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.3);
+}
+
+.card-number-embossed {
+  font-family: "Courier New", Courier, monospace;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+  margin: 10px 0;
+  z-index: 2;
+}
+
+.card-bottom-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  z-index: 2;
+}
+
+.card-holder-name {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+}
+
+.card-member-since {
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  opacity: 0.8;
+}
+
+.card-network-logo {
+  font-size: 12px;
+  font-weight: 900;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+/* Membership Rewards Pill Bar */
+.rewards-strip {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 14px 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--amex-border);
+}
+
+.rewards-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.rewards-label {
+  font-size: 11px;
+  color: var(--amex-text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.rewards-value {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--amex-navy);
+}
+
+.rewards-tag {
+  background: #ecfdf5;
+  color: #059669;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid #a7f3d0;
+}
+
+/* Quick Action Circles */
+.quick-actions-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.action-pill-btn {
+  background: #ffffff;
+  border: 1px solid var(--amex-border);
+  border-radius: 14px;
+  padding: 12px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: var(--shadow-sm);
+}
+
+.action-pill-btn:hover {
+  border-color: var(--amex-blue-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.action-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #eff6ff;
+  color: var(--amex-blue-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.action-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--amex-text-dark);
+}
+
+/* ==============================================================================
+   SECTION HEADERS
+   ============================================================================== */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--amex-navy);
+  letter-spacing: -0.3px;
+}
+
+.section-link {
+  font-size: 12px;
+  color: var(--amex-blue-primary);
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+/* ==============================================================================
+   ITINERARY TIMELINE (FLIGHT, CAB, HOTEL, LOUNGE, DINNER)
+   ============================================================================== */
+.itinerary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.itinerary-item-card {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid var(--amex-border);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: transform 0.2s, border-color 0.2s;
+  position: relative;
+}
+
+.itinerary-item-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: var(--shadow-md);
+}
+
+.itinerary-item-card.disrupted-card {
+  border: 1.5px solid #ef4444;
+  background: #fff5f5;
+}
+
+.itinerary-item-card.rebooked-card {
+  border: 1.5px solid #059669;
+  background: #f0fdf4;
+}
+
+.item-top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.item-category-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--amex-text-muted);
+}
+
+.status-badge {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.green {
+  background: #ecfdf5;
+  color: #059669;
+  border: 1px solid #a7f3d0;
+}
+
+.status-badge.red {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  animation: pulse-red 2s infinite;
+}
+
+.status-badge.amber {
+  background: #fffbeb;
+  color: #d97706;
+  border: 1px solid #fde68a;
+}
+
+.status-badge.gray {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+}
+
+@keyframes pulse-red {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.item-main-details {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--amex-text-dark);
+}
+
+.item-subtext {
+  font-size: 12px;
+  color: var(--amex-text-muted);
+}
+
+.item-schedule-row {
+  display: flex;
+  justify-content: space-between;
+  background: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.item-schedule-time {
+  font-weight: 700;
+  color: var(--amex-navy);
+}
+
+.item-perk-footer {
+  font-size: 11px;
+  color: var(--amex-blue-primary);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  border-top: 1px dashed var(--amex-border);
+  padding-top: 8px;
+}
+
+/* Flight Route Diagram */
+.flight-route-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.airport-node {
+  display: flex;
+  flex-direction: column;
+}
+
+.airport-code {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--amex-navy);
+  letter-spacing: -0.5px;
+}
+
+.airport-city {
+  font-size: 11px;
+  color: var(--amex-text-muted);
+}
+
+.flight-path-line {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 16px;
+  gap: 2px;
+}
+
+.path-line-draw {
+  width: 100%;
+  height: 2px;
+  background: #cbd5e1;
+  position: relative;
+}
+
+.path-plane-icon {
+  font-size: 14px;
+  color: var(--amex-blue-primary);
+}
+
+/* ==============================================================================
+   DISRUPTION HUB & HITL RECOVERY PACKAGES (NODE 4 & 5)
+   ============================================================================== */
+.disruption-hub-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Impact Radar Table */
+.impact-radar-box {
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid var(--amex-border);
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.impact-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.impact-badge-pill {
+  background: #fef2f2;
+  color: #dc2626;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid #fecaca;
+}
+
+.impact-row-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.impact-row-item:last-child {
+  border-bottom: none;
+}
+
+.impact-icon-col {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #dc2626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.impact-details-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.impact-title-line {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.impact-desc-line {
+  font-size: 11px;
+  color: #64748b;
+  line-height: 1.4;
+}
+
+.impact-exposure-tag {
+  font-size: 11px;
+  font-weight: 800;
+  color: #dc2626;
+}
+
+/* Recovery Option Cards */
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.option-card {
+  background: #ffffff;
+  border-radius: 16px;
+  border: 2px solid var(--amex-border);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+.option-card:hover {
+  border-color: var(--amex-blue-primary);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.option-card.selected-option {
+  border-color: var(--amex-blue-primary);
+  background: #f8fbff;
+  box-shadow: 0 0 0 3px rgba(0, 112, 209, 0.2);
+}
+
+.option-top-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  display: inline-block;
+  align-self: flex-start;
+}
+
+.option-top-badge.blue {
+  background: #0070d1;
+  color: #ffffff;
+}
+
+.option-top-badge.amber {
+  background: #d97706;
+  color: #ffffff;
+}
+
+.option-top-badge.gray {
+  background: #475569;
+  color: #ffffff;
+}
+
+.option-title-text {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--amex-navy);
+}
+
+.option-summary-text {
+  font-size: 12px;
+  color: var(--amex-text-muted);
+  line-height: 1.45;
+}
+
+.option-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  padding: 8px;
+  text-align: center;
+}
+
+.metric-col-title {
+  font-size: 10px;
+  color: var(--amex-text-muted);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.metric-col-val {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--amex-navy);
+}
+
+.option-sync-bullets {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: #334155;
+}
+
+.option-sync-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-approve-option {
+  width: 100%;
+  background: var(--amex-navy);
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s;
+  box-shadow: 0 4px 10px rgba(0, 38, 99, 0.3);
+}
+
+.btn-approve-option:hover {
+  background: #00175a;
+  transform: translateY(-1px);
+}
+
+/* ==============================================================================
+   GRAPH ARCHITECTURE & LIVE VISUALIZER TAB
+   ============================================================================== */
+.graph-tab-container {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.graph-status-bar {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--amex-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.graph-state-badge {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: #eff6ff;
+  color: var(--amex-blue-primary);
+  border: 1px solid #bfdbfe;
+}
+
+.mermaid-render-box {
+  background: #0f172a;
+  border-radius: 16px;
+  padding: 16px;
+  color: #ffffff;
+  box-shadow: var(--shadow-md);
+  overflow-x: auto;
+  border: 1px solid #1e293b;
+}
+
+.nodes-timeline-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.graph-node-card {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 12px;
+  border: 1px solid var(--amex-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.2s;
+}
+
+.graph-node-card.active-node {
+  border-color: var(--amex-blue-primary);
+  background: #f0f7ff;
+  box-shadow: 0 0 0 2px rgba(0, 112, 209, 0.2);
+}
+
+.graph-node-card.paused-node {
+  border-color: #d97706;
+  background: #fffbeb;
+}
+
+.graph-node-card.completed-node {
+  border-color: #059669;
+  background: #f0fdf4;
+}
+
+.node-left-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.node-step-circle {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 11px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.graph-node-card.active-node .node-step-circle {
+  background: var(--amex-blue-primary);
+  color: #ffffff;
+}
+
+.graph-node-card.completed-node .node-step-circle {
+  background: #059669;
+  color: #ffffff;
+}
+
+.node-name-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--amex-text-dark);
+}
+
+.node-desc-text {
+  font-size: 11px;
+  color: var(--amex-text-muted);
+}
+
+/* ==============================================================================
+   AMEX CONCIERGE CHAT TAB
+   ============================================================================== */
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 12px;
+}
+
+.chat-bubble-stream {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+  overflow-y: auto;
+}
+
+.chat-bubble {
+  max-width: 85%;
+  padding: 12px 14px;
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1.45;
+  box-shadow: var(--shadow-sm);
+}
+
+.chat-bubble.assistant {
+  background: #ffffff;
+  color: var(--amex-text-dark);
+  align-self: flex-start;
+  border-bottom-left-radius: 4px;
+  border: 1px solid var(--amex-border);
+}
+
+.chat-bubble.user {
+  background: var(--amex-navy);
+  color: #ffffff;
+  align-self: flex-end;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-quick-suggestions {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.btn-suggestion {
+  white-space: nowrap;
+  background: #ffffff;
+  border: 1px solid var(--amex-border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  font-size: 11px;
+  color: var(--amex-blue-primary);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-suggestion:hover {
+  background: #eff6ff;
+  border-color: var(--amex-blue-primary);
+}
+
+.chat-input-bar {
+  display: flex;
+  gap: 8px;
+  background: #ffffff;
+  border: 1px solid var(--amex-border);
+  border-radius: 24px;
+  padding: 4px 6px 4px 14px;
+  align-items: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.chat-input-box {
+  flex: 1;
+  border: none;
+  outline: none;
+  font-size: 13px;
+  background: transparent;
+}
+
+.btn-send-chat {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--amex-navy);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-send-chat:hover {
+  background: var(--amex-blue-primary);
+}
+
+/* ==============================================================================
+   AMEX 5-TAB BOTTOM NAVIGATION BAR
+   ============================================================================== */
+.amex-bottom-navbar {
+  height: 64px;
+  background: #ffffff;
+  border-top: 1px solid var(--amex-border);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  padding: 0 4px;
+  z-index: 50;
+  flex-shrink: 0;
+}
+
+.nav-tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-decoration: none;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+  position: relative;
+}
+
+.nav-tab-item:hover, .nav-tab-item.active {
+  color: var(--amex-navy);
+}
+
+.nav-tab-icon {
+  font-size: 18px;
+  position: relative;
+}
+
+.nav-tab-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+}
+
+.nav-badge-dot {
+  position: absolute;
+  top: -2px;
+  right: -6px;
+  width: 8px;
+  height: 8px;
+  background: #ef4444;
+  border-radius: 50%;
+}
+
+/* Bottom phone home indicator */
+.phone-home-indicator {
+  height: 20px;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.home-bar-pill {
+  width: 130px;
+  height: 4px;
+  background: #0f172a;
+  border-radius: 4px;
+}

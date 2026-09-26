@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>American Express® Travel Concierge - LangGraph Pro</title>
+  
+  <!-- FontAwesome Icons & Google Fonts -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Mermaid.js for Dynamic Graph Flowcharts -->
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.8.0/dist/mermaid.min.js"></script>
+  
+  <!-- Amex Design System CSS -->
+  <link rel="stylesheet" href="/static/css/amex_style.css">
+</head>
+<body>
+
+  <!-- ============================================================================
+       TOP GLOBAL COCKPIT / SIMULATOR TOOLBAR
+       ============================================================================ -->
+  <header class="top-cockpit">
+    <div class="cockpit-brand">
+      <span class="amex-box-logo">AMEX</span>
+      <div>
+        <div class="cockpit-title">Travel Disruption Shield • LangGraph Autonomous Engine</div>
+        <div class="cockpit-sub">Multi-Modal Tracking (Flight, Cab, Hotel, Lounge, Dinner) • Human-in-the-Loop</div>
+      </div>
+    </div>
+    <div class="cockpit-actions">
+      <button class="btn-cockpit btn-disrupt" id="btn-simulate-disruption" title="Trigger real-time flight cancellation and run LangGraph">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span>Simulate AA-1420 Cancellation</span>
+      </button>
+      <button class="btn-cockpit btn-reset" id="btn-reset-itinerary" title="Reset itinerary to initial pristine state">
+        <i class="fa-solid fa-rotate-right"></i>
+        <span>Reset State</span>
+      </button>
+      <button class="btn-cockpit btn-toggle-frame" id="btn-toggle-viewport" title="Expand view to full width desktop layout">
+        <i class="fa-solid fa-expand"></i>
+        <span id="frame-toggle-label">Expand View</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ============================================================================
+       SMARTPHONE VIEWPORT CONTAINER (AMEX MOBILE APP)
+       ============================================================================ -->
+  <main class="app-viewport-wrapper" id="viewport-wrapper">
+    <div class="mobile-phone-frame">
+      
+      <!-- Top iOS Status Bar & Dynamic Island -->
+      <div class="phone-status-bar">
+        <span>9:41</span>
+        <div class="dynamic-island"></div>
+        <div class="phone-icons">
+          <i class="fa-solid fa-signal"></i>
+          <i class="fa-solid fa-wifi"></i>
+          <i class="fa-solid fa-battery-full"></i>
+        </div>
+      </div>
+
+      <!-- Amex Mobile App Header -->
+      <div class="amex-app-header">
+        <div class="header-user">
+          <div class="user-avatar" id="user-avatar">AV</div>
+          <div>
+            <div class="user-welcome-sub">Welcome back</div>
+            <div class="user-name" id="user-display-name">Alexander V. Vance</div>
+          </div>
+        </div>
+        <div class="header-badges">
+          <span class="badge-centurion" id="user-badge"><i class="fa-solid fa-crown"></i> CENTURION</span>
+          <button class="btn-notif-bell" id="bell-notif-btn" title="Notifications">
+            <i class="fa-regular fa-bell"></i>
+            <span class="notif-bubble" id="notif-badge-dot" style="display: none;"></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Dynamic Urgent Disruption Banner (Appears when flight is cancelled) -->
+      <div id="urgent-disruption-banner" style="display: none; padding: 12px 16px 0;">
+        <div class="disruption-alert-card">
+          <div class="disruption-alert-top">
+            <div class="alert-headline">
+              <i class="fa-solid fa-circle-exclamation"></i>
+              <span>FLIGHT CANCELLED • AA-1420</span>
+            </div>
+            <span class="alert-badge">AMEX INTERVENTION</span>
+          </div>
+          <div class="alert-body-text">
+            American Airlines cancelled Flight AA-1420. The LangGraph Travel Concierge has automatically protected your cab, hotel, lounge, and dinner reservations.
+          </div>
+          <button class="alert-action-btn" onclick="switchTab('disruption')">
+            <span>Review 3 Recovery Packages</span>
+            <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Main Scrollable App Container -->
+      <div class="app-screen-scroll" id="screen-container">
+
+        <!-- ======================================================================
+             TAB 1: HOME (AMEX CARD, BALANCES, ACTIVE TRIP)
+             ====================================================================== -->
+        <section class="tab-pane active" id="tab-home">
+          
+          <!-- Physical Card Visual (Centurion / Platinum) -->
+          <div class="card-section">
+            <div class="amex-physical-card card-centurion" id="amex-card-view">
+              <div class="card-watermark"></div>
+              <div class="card-top-row">
+                <span class="card-brand-title" id="card-type-title">AMERICAN EXPRESS • CENTURION</span>
+                <div class="card-chip"></div>
+              </div>
+              <div class="card-number-embossed" id="card-embossed-num">•••• •••• •••• 84001</div>
+              <div class="card-bottom-row">
+                <div>
+                  <div class="card-holder-name" id="card-holder-text">ALEXANDER V. VANCE</div>
+                  <div class="card-member-since">MEMBER SINCE 17</div>
+                </div>
+                <div class="card-network-logo">AMEX</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Membership Rewards Points Strip -->
+          <div class="rewards-strip">
+            <div class="rewards-left">
+              <span class="rewards-label">Membership Rewards® Points</span>
+              <span class="rewards-value" id="points-display">482,910 pts</span>
+            </div>
+            <span class="rewards-tag"><i class="fa-solid fa-shield-halved"></i> $10k Protected</span>
+          </div>
+
+          <!-- Quick Action Buttons -->
+          <div class="quick-actions-row">
+            <div class="action-pill-btn" onclick="switchTab('itinerary')">
+              <div class="action-icon"><i class="fa-solid fa-route"></i></div>
+              <span class="action-title">Itinerary</span>
+            </div>
+            <div class="action-pill-btn" onclick="switchTab('disruption')">
+              <div class="action-icon"><i class="fa-solid fa-shield-heart"></i></div>
+              <span class="action-title">Disruption</span>
+            </div>
+            <div class="action-pill-btn" onclick="switchTab('concierge')">
+              <div class="action-icon"><i class="fa-solid fa-headset"></i></div>
+              <span class="action-title">Concierge</span>
+            </div>
+            <div class="action-pill-btn" onclick="switchTab('graph')">
+              <div class="action-icon"><i class="fa-solid fa-network-wired"></i></div>
+              <span class="action-title">Graph Live</span>
+            </div>
+          </div>
+
+          <!-- Active Trip Summary Banner -->
+          <div class="section-header">
+            <span class="section-title">Active Journey • New York ➔ Los Angeles</span>
+            <span class="section-link" onclick="switchTab('itinerary')">View All</span>
+          </div>
+
+          <!-- Compact Mini Itinerary Cards -->
+          <div class="itinerary-list" id="home-compact-itinerary">
+            <!-- Populated dynamically via JS -->
+          </div>
+
+        </section>
+
+        <!-- ======================================================================
+             TAB 2: ITINERARY (FLIGHT, CAB, HOTEL, LOUNGE, DINNER)
+             ====================================================================== -->
+        <section class="tab-pane" id="tab-itinerary">
+          <div class="section-header">
+            <span class="section-title">Multi-Modal Travel Timeline</span>
+            <span class="section-link" onclick="fetchState()"><i class="fa-solid fa-arrows-rotate"></i> Sync</span>
+          </div>
+
+          <!-- 1. FLIGHT CARD -->
+          <div class="itinerary-item-card" id="flight-card-container">
+            <div class="item-top-row">
+              <div class="item-category-tag">
+                <i class="fa-solid fa-plane"></i>
+                <span>Flight</span>
+              </div>
+              <span class="status-badge green" id="flight-status-badge">ON TIME</span>
+            </div>
+            <div class="flight-route-box">
+              <div class="airport-node">
+                <span class="airport-code" id="flight-origin-code">JFK</span>
+                <span class="airport-city">New York</span>
+              </div>
+              <div class="flight-path-line">
+                <i class="fa-solid fa-plane path-plane-icon"></i>
+                <div class="path-line-draw"></div>
+                <span style="font-size: 10px; color: #64748b;" id="flight-carrier-line">AA-1420 • First</span>
+              </div>
+              <div class="airport-node" style="text-align: right;">
+                <span class="airport-code" id="flight-dest-code">LAX</span>
+                <span class="airport-city">Los Angeles</span>
+              </div>
+            </div>
+            <div class="item-schedule-row">
+              <div>
+                <span style="color: #64748b;">Departure:</span>
+                <span class="item-schedule-time" id="flight-dep-time">15:45 EST</span>
+              </div>
+              <div>
+                <span style="color: #64748b;">Seat:</span>
+                <span class="item-schedule-time" id="flight-seat-num">2B (Flagship)</span>
+              </div>
+              <div>
+                <span style="color: #64748b;">PNR:</span>
+                <span class="item-schedule-time" id="flight-pnr-code">AMX7X9</span>
+              </div>
+            </div>
+            <div class="item-perk-footer">
+              <i class="fa-solid fa-gem"></i>
+              <span>American Flagship First Suite • Amex Seat Protection</span>
+            </div>
+          </div>
+
+          <!-- 2. CAB CARD -->
+          <div class="itinerary-item-card" id="cab-card-container">
+            <div class="item-top-row">
+              <div class="item-category-tag">
+                <i class="fa-solid fa-car"></i>
+                <span>VIP Chauffeur</span>
+              </div>
+              <span class="status-badge green" id="cab-status-badge">CONFIRMED</span>
+            </div>
+            <div class="item-main-details">
+              <div class="item-name" id="cab-service-name">Blacklane Executive Chauffeur</div>
+              <div class="item-subtext" id="cab-car-model">Mercedes-Benz S-Class (Black Edition) • Driver: Marcus Thorne</div>
+            </div>
+            <div class="item-schedule-row">
+              <div>
+                <span style="color: #64748b;">Pickup:</span>
+                <span class="item-schedule-time" id="cab-pickup-time">19:40 PST</span>
+              </div>
+              <div>
+                <span style="color: #64748b;">Location:</span>
+                <span class="item-schedule-time" id="cab-pickup-loc">LAX Bradley VIP</span>
+              </div>
+            </div>
+            <div class="item-perk-footer">
+              <i class="fa-solid fa-shield-halved"></i>
+              <span>Curbside Flight Tracking Guarantee • \$0 Wait Time Penalty</span>
+            </div>
+          </div>
+
+          <!-- 3. HOTEL CARD -->
+          <div class="itinerary-item-card" id="hotel-card-container">
+            <div class="item-top-row">
+              <div class="item-category-tag">
+                <i class="fa-solid fa-hotel"></i>
+                <span>Luxury Stay</span>
+              </div>
+              <span class="status-badge green" id="hotel-status-badge">CONFIRMED</span>
+            </div>
+            <div class="item-main-details">
+              <div class="item-name" id="hotel-property-name">The Beverly Hills Hotel & Bungalows</div>
+              <div class="item-subtext" id="hotel-room-type">Bungalow Garden Suite with Fireplace (3 Nights)</div>
+            </div>
+            <div class="item-schedule-row">
+              <div>
+                <span style="color: #64748b;">Check-In:</span>
+                <span class="item-schedule-time" id="hotel-checkin-time">Today, 20:30 PST</span>
+              </div>
+              <div>
+                <span style="color: #64748b;">Code:</span>
+                <span class="item-schedule-time" id="hotel-res-code">BHH-AMX-5519</span>
+              </div>
+            </div>
+            <div class="item-perk-footer">
+              <i class="fa-solid fa-award"></i>
+              <span>Fine Hotels & Resorts®: Late Arrival Hold & Guaranteed 4 PM Checkout</span>
+            </div>
+          </div>
+
+          <!-- 4. LOUNGE CARD -->
+          <div class="itinerary-item-card" id="lounge-card-container">
+            <div class="item-top-row">
+              <div class="item-category-tag">
+                <i class="fa-solid fa-martini-glass"></i>
+                <span>Airport Lounge</span>
+              </div>
+              <span class="status-badge green" id="lounge-status-badge">ACTIVE PASS</span>
+            </div>
+            <div class="item-main-details">
+              <div class="item-name" id="lounge-name-text">The Centurion® Lounge - JFK</div>
+              <div class="item-subtext" id="lounge-terminal-text">Terminal 4 • Access Window: 13:00 - 15:45 EST</div>
+            </div>
+            <div class="item-schedule-row" style="align-items: center;">
+              <div>
+                <span style="color: #64748b;">Pass Barcode:</span>
+                <span class="item-schedule-time" id="lounge-barcode-text" style="font-family: monospace;">AMX-CENT-JFK-99824</span>
+              </div>
+              <span style="font-size: 11px; color: #0070d1; font-weight: 700;"><i class="fa-solid fa-qrcode"></i> Digital Key</span>
+            </div>
+            <div class="item-perk-footer">
+              <i class="fa-solid fa-wine-glass"></i>
+              <span>1850 Speakeasy Cocktails & Ignacio Mattos Signature Dining</span>
+            </div>
+          </div>
+
+          <!-- 5. DINNER CARD -->
+          <div class="itinerary-item-card" id="dinner-card-container">
+            <div class="item-top-row">
+              <div class="item-category-tag">
+                <i class="fa-solid fa-utensils"></i>
+                <span>Fine Dining</span>
+              </div>
+              <span class="status-badge green" id="dinner-status-badge">CONFIRMED</span>
+            </div>
+            <div class="item-main-details">
+              <div class="item-name" id="dinner-restaurant-name">Nobu Malibu</div>
+              <div class="item-subtext" id="dinner-table-type">Prime Oceanfront Patio Terrace • 2 Guests</div>
+            </div>
+            <div class="item-schedule-row">
+              <div>
+                <span style="color: #64748b;">Time:</span>
+                <span class="item-schedule-time" id="dinner-time-text">20:45 PST</span>
+              </div>
+              <div>
+                <span style="color: #64748b;">Policy Protection:</span>
+                <span class="item-schedule-time" style="color: #059669;">\$200 Fee Shielded</span>
+              </div>
+            </div>
+            <div class="item-perk-footer">
+              <i class="fa-solid fa-star"></i>
+              <span>Global Dining Access by Resy • VIP Table Priority</span>
+            </div>
+          </div>
+
+        </section>
+
+        <!-- ======================================================================
+             TAB 3: DISRUPTION HUB & HITL RECOVERY (NODE 4 & 5)
+             ====================================================================== -->
+        <section class="tab-pane" id="tab-disruption">
+          
+          <div class="disruption-hub-container">
+            
+            <div class="section-header">
+              <span class="section-title">Disruption Hub & Mitigation Center</span>
+              <span class="graph-state-badge" id="disruption-hub-badge">IDLE</span>
+            </div>
+
+            <!-- Impact Radar Box -->
+            <div class="impact-radar-box" id="impact-radar-box">
+              <div class="impact-header-row">
+                <span style="font-size: 13px; font-weight: 800; color: #0f172a;">Cascaded Impact Assessment</span>
+                <span class="impact-badge-pill" id="exposure-amount-pill">Exposure: \$0.00</span>
+              </div>
+              <div id="impact-items-list">
+                <div style="font-size: 12px; color: #64748b; padding: 10px 0; text-align: center;">
+                  All 5 travel services operating smoothly. Tap "Simulate AA-1420 Cancellation" above to test the autonomous crisis response.
+                </div>
+              </div>
+            </div>
+
+            <!-- Amex Protections Unlocked -->
+            <div class="impact-radar-box" id="policy-box" style="display: none;">
+              <span style="font-size: 13px; font-weight: 800; color: #0f172a;">Amex Cardmember Protections Engaged</span>
+              <div id="policy-items-list" style="display: flex; flex-direction: column; gap: 8px; margin-top: 6px;"></div>
+            </div>
+
+            <!-- Recovery Packages (Human in the Loop Options) -->
+            <div class="section-header" id="options-header" style="display: none;">
+              <span class="section-title">Multi-Modal Recovery Packages</span>
+              <span style="font-size: 11px; color: #0070d1; font-weight: 700;">Human-in-the-Loop Approval</span>
+            </div>
+
+            <div class="options-list" id="options-container">
+              <!-- Rendered dynamically -->
+            </div>
+
+            <!-- Rebooking Execution Receipts (Appears after approval) -->
+            <div class="impact-radar-box" id="rebooking-receipt-box" style="display: none;">
+              <div class="impact-header-row">
+                <span style="font-size: 13px; font-weight: 800; color: #059669;">
+                  <i class="fa-solid fa-check-circle"></i> Synchronization Executed
+                </span>
+                <span class="status-badge green">COMPLETED</span>
+              </div>
+              <div id="receipt-items-list" style="font-size: 12px; color: #334155; line-height: 1.5; margin-top: 6px;">
+                All 5 services have been reconciled in real-time via Airline GDS, Blacklane Chauffeur dispatch, The Beverly Hills Hotel PMS, and Resy VIP Dining.
+              </div>
+            </div>
+
+          </div>
+
+        </section>
+
+        <!-- ======================================================================
+             TAB 4: GRAPH LIVE (LANGGRAPH ARCHITECTURE & STATE INSPECTOR)
+             ====================================================================== -->
+        <section class="tab-pane" id="tab-graph">
+          
+          <div class="graph-tab-container">
+            
+            <div class="graph-status-bar">
+              <div>
+                <div style="font-size: 13px; font-weight: 800; color: #002663;">LangGraph Architecture</div>
+                <div style="font-size: 10px; color: #64748b;">Thread: alex_vance_trip_2026</div>
+              </div>
+              <span class="graph-state-badge" id="graph-live-status-pill">STATUS: IDLE</span>
+            </div>
+
+            <!-- Interactive Mermaid Diagram -->
+            <div class="mermaid-render-box">
+              <div style="font-size: 11px; color: #94a3b8; font-family: monospace; margin-bottom: 8px;">
+                <i class="fa-solid fa-diagram-project"></i> LIVE COMPILED GRAPH TOPOLOGY
+              </div>
+              <div class="mermaid" id="mermaid-container">
+flowchart TD
+    START((Start)) --> IN[1. Itinerary Monitor]
+    IN -->|Flight Disrupted| DIA[2. Downstream Impact]
+    IN -->|Normal Operations| END_NODE((End))
+    DIA --> POL[3. Amex Policy Engine]
+    POL --> OPT[4. Option Generator]
+    OPT --> HITL["5. Human-In-The-Loop Interrupt Breakpoint"]
+    HITL -.->|User Approves| REB[6. Rebooking Orchestrator]
+    REB --> NOTIF[7. Notification Synthesizer]
+    NOTIF --> AUD[8. Audit & Telemetry]
+    AUD --> END_NODE((Resolved & Synchronized))
+              </div>
+            </div>
+
+            <!-- 8 Node Interactive Cards List -->
+            <div class="section-header">
+              <span class="section-title">Graph Execution Nodes</span>
+            </div>
+
+            <div class="nodes-timeline-list" id="nodes-timeline-list">
+              <!-- Dynamically populated -->
+            </div>
+
+            <!-- Live State Inspector -->
+            <div class="section-header">
+              <span class="section-title">Raw LangGraph State Inspector</span>
+            </div>
+            <pre style="background: #0f172a; color: #38bdf8; padding: 12px; border-radius: 12px; font-size: 11px; font-family: monospace; overflow-x: auto; max-height: 250px;" id="raw-state-inspector">
+Loading graph state...
+            </pre>
+
+          </div>
+
+        </section>
+
+        <!-- ======================================================================
+             TAB 5: AMEX CONCIERGE CHAT (GROQ LLM TRAVEL ASSISTANT)
+             ====================================================================== -->
+        <section class="tab-pane" id="tab-concierge" style="height: calc(100% - 20px);">
+          
+          <div class="chat-container">
+            
+            <div class="chat-bubble-stream" id="chat-stream">
+              <div class="chat-bubble assistant">
+                Good day, Mr. Vance. I am your American Express Centurion Travel Concierge. I am continuously tracking your flight, chauffeur, hotel, lounge, and dinner reservations. How may I be of service?
+              </div>
+            </div>
+
+            <!-- Quick Prompt Suggestions -->
+            <div class="chat-quick-suggestions">
+              <button class="btn-suggestion" onclick="sendQuickChat('What is the status of my flight?')">Flight status?</button>
+              <button class="btn-suggestion" onclick="sendQuickChat('Will I miss my dinner at Nobu?')">Dinner at Nobu?</button>
+              <button class="btn-suggestion" onclick="sendQuickChat('What does my Amex Trip Protection cover?')">Insurance coverage?</button>
+              <button class="btn-suggestion" onclick="sendQuickChat('Is my Blacklane chauffeur notified?')">Chauffeur status?</button>
+            </div>
+
+            <!-- Input Bar -->
+            <form class="chat-input-bar" id="chat-form" onsubmit="handleChatSubmit(event)">
+              <input type="text" class="chat-input-box" id="chat-input" placeholder="Ask your Amex Travel Concierge..." autocomplete="off">
+              <button type="submit" class="btn-send-chat" id="chat-send-btn">
+                <i class="fa-solid fa-arrow-up"></i>
+              </button>
+            </form>
+
+          </div>
+
+        </section>
+
+      </div>
+
+      <!-- Amex Mobile App 5-Tab Bottom Navigation Bar -->
+      <nav class="amex-bottom-navbar">
+        <div class="nav-tab-item active" onclick="switchTab('home')" id="nav-btn-home">
+          <div class="nav-tab-icon"><i class="fa-solid fa-house"></i></div>
+          <span class="nav-tab-label">Home</span>
+        </div>
+        <div class="nav-tab-item" onclick="switchTab('itinerary')" id="nav-btn-itinerary">
+          <div class="nav-tab-icon"><i class="fa-solid fa-calendar-check"></i></div>
+          <span class="nav-tab-label">Itinerary</span>
+        </div>
+        <div class="nav-tab-item" onclick="switchTab('disruption')" id="nav-btn-disruption">
+          <div class="nav-tab-icon">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span class="nav-badge-dot" id="disruption-nav-dot" style="display: none;"></span>
+          </div>
+          <span class="nav-tab-label">Disruption</span>
+        </div>
+        <div class="nav-tab-item" onclick="switchTab('graph')" id="nav-btn-graph">
+          <div class="nav-tab-icon"><i class="fa-solid fa-network-wired"></i></div>
+          <span class="nav-tab-label">Graph Live</span>
+        </div>
+        <div class="nav-tab-item" onclick="switchTab('concierge')" id="nav-btn-concierge">
+          <div class="nav-tab-icon"><i class="fa-solid fa-headset"></i></div>
+          <span class="nav-tab-label">Concierge</span>
+        </div>
+      </nav>
+
+      <!-- Bottom Phone Home Indicator Bar -->
+      <div class="phone-home-indicator">
+        <div class="home-bar-pill"></div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Amex JavaScript Application Engine -->
+  <script src="/static/js/amex_app.js"></script>
+</body>
+</html>
