@@ -49,7 +49,7 @@ Candidate reports vary by team, so confirm the format with your recruiter.
 | [batch_07_mcp_a2a_skills_assistants](batch_07_mcp_a2a_skills_assistants/README.md) | MCP, A2A, Agent Skills & Personal AI Assistants | Q0601–Q0700 | Knowledge of A2A, MCP, AI skills development, personal AI assistants and agentic orchestrators. |
 | [batch_08_azure_openai_bedrock_cloud_ai](batch_08_azure_openai_bedrock_cloud_ai/README.md) | Azure OpenAI, AWS Bedrock & Cloud AI Infrastructure | Q0701–Q0800 | Implement GenAI services leveraging Azure OpenAI models and AWS Bedrock; public cloud architecture; elastic compute. |
 | [batch_09_genai_services_fastapi](batch_09_genai_services_fastapi/README.md) | Building GenAI Services: FastAPI, Streaming, Queues & NoSQL | Q0801–Q0900 | Python (FastAPI); microservices and APIs; elastic compute, NoSQL databases and messaging queues; containerization. |
-| batch_10_ai_security_responsible_ai | AI Security, Guardrails & Responsible AI in a Bank | pending | Write secure, high-quality production code; secure, reliable AI capabilities; technology controls agenda. |
+| [batch_10_ai_security_responsible_ai](batch_10_ai_security_responsible_ai/README.md) | AI Security, Guardrails & Responsible AI in a Bank | Q0901–Q1000 | Write secure, high-quality production code; secure, reliable AI capabilities; technology controls agenda. |
 | [behavioural_questions](behavioural_questions/README.md) | Behavioural, Role & JPMorganChase | B0001–B0100 | Team player who seeks and applies feedback; collaborate with senior engineers in design discussions. |
 | resume_questions | Resume Deep-Dive (Nikhil Goyal) | pending | Every JD line mapped to a claim on the resume that the interviewer can probe. |
 
